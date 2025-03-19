@@ -1,0 +1,329 @@
+---
+title: Build NOGO MOdel
+date: 2025-03-07
+tags: []
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: true
+  message: false
+  warning: false
+  class-output: 'r'
+---
+
+```{r}
+library(targets)
+library(sjnftools)
+library(tidymodels)
+library(tidysdm)
+library(tidyverse)
+library(sf)
+library(terra)
+library(tidyterra)
+```
+
+```{r}
+cov <- tar_read(all_covs) |>
+  drop_na() |>
+  mutate(canopy_cover = as.numeric(canopy_cover)) |>
+  select(-id)
+
+nest_rec <- recipe(cov, formula = class ~ height_m + elevation + slope + aspect + TPI + TRI + canopy_cover + focal_mean + evt_gp_n_grouped + DESCRIPTIO) |>
+  step_normalize(all_numeric()) |> 
+  step_dummy(evt_gp_n_grouped, DESCRIPTIO) 
+
+cov |>
+  check_sdm_presence(class)
+```
+
+```{r}
+nest_models <-
+  # create the workflow_set
+  workflow_set(
+    preproc = list(default = nest_rec),
+    models = list(
+      # the standard glm specs
+      glm = sdm_spec_glm(),
+      # rf specs with tuning
+      rf = sdm_spec_rf(),
+      # boosted tree model (gbm) specs with tuning
+      gbm = sdm_spec_boost_tree(),
+      # maxent specs with tuning
+      maxent = sdm_spec_maxent()
+    ),
+    # make all combinations of preproc and models,
+    cross = TRUE
+  ) %>%
+  # tweak controls to store information needed later to create the ensemble
+  option_add(control = control_ensemble_grid())
+```
+
+## cross validation
+```{r}
+set.seed(1234)
+nest_cv <- spatial_block_cv(cov, v = 5)
+autoplot(nest_cv)
+check_splits_balance(nest_cv, class)
+```
+
+## Run Model
+```{r}
+set.seed(45657)
+nest_models <- nest_models |>
+  workflow_map(
+    "tune_grid",
+    resamples = nest_cv,
+    grid = 15,
+    metrics = sdm_metric_set(),
+    verbose = T
+  )
+```
+```{r}
+autoplot(nest_models)
+```
+
+```{r}
+nest_ensamble <- simple_ensemble() |>
+  add_member(nest_models, metric = "boyce_cont")
+
+saveRDS(nest_ensamble, "output/model_V4.rds")
+
+autoplot(nest_ensamble)
+```
+
+## Stacks model selection
+```{r}
+library(stacks)
+nest_stack<-stacks() |>
+  add_candidates(nest_models) |>
+  blend_predictions() |>
+  fit_members()
+
+autoplot(nest_stack, type="weights")
+
+saveRDS(nest_stack, "output/model_V4_stack.rds")
+```
+
+
+
+
+```{r}
+get_covs_for_predict<-function(area){
+t <- tar_read(terrain)
+crd_bd_cl <- area |>
+  st_transform(crs(t))
+t_cl <- t |>
+  crop(crd_bd_cl, mask = T)
+
+cc <- tar_read(tar_load_clip_tree_canopy_cover)
+names(cc) <- "canopy_cover"
+
+crd_bd_cl2 <- area |>
+  st_transform(crs(cc))
+
+cc_cl <- cc |>
+  crop(crd_bd_cl2, mask = T)
+
+t_cl_p <- project(t_cl, cc_cl)
+
+focal_cc <- cc_cl |>
+  focal(w = 15, fun = "mean")
+
+evh_raw <- rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif")
+
+evh_c <- cats(evh_raw)[[1]] |>
+  mutate(
+    height_m = str_extract(CLASSNAMES, "\\d+"),
+    height_m = ifelse(is.na(height_m), 0, height_m) |>
+      as.numeric()
+  )
+
+levels(evh_raw) <- list(evh_c)
+
+activeCat(evh_raw) <- "height_m"
+
+crd_bd_cl3 <- area |>
+  st_transform(crs(evh_raw))
+
+evh_cl<-evh_raw |>
+  crop(crd_bd_cl3, mask=T) |>
+  project(cc_cl)
+
+evt_raw<-rast(tar_read(landfire_evt_file))
+
+levels(evt_raw)<-tar_read(evt_gp_n_grouped_level)
+
+evt<-evt_raw |>
+  crop(crd_bd_cl3) |>
+  project(cc_cl)
+
+sclass<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif") |>
+    crop(crd_bd_cl3) |>
+    project(cc_cl) 
+
+  activeCat(sclass)<-"DESCRIPTIO"
+
+cov_rast <- c(t_cl_p, cc_cl, focal_cc, evh_cl, evt, sclass)
+  cov_rast
+}
+area<-crd_bd
+t <- tar_read(terrain)
+crd_bd_cl <- area |>
+  st_transform(crs(t))
+t_cl <- t |>
+  crop(crd_bd_cl, mask = T)
+
+cc <- tar_read(tar_load_clip_tree_canopy_cover)
+names(cc) <- "canopy_cover"
+
+crd_bd_cl2 <- area |>
+  st_transform(crs(cc))
+
+cc_cl <- cc |>
+  crop(crd_bd_cl2, mask = T)
+
+t_cl_p <- project(t_cl, cc_cl)
+
+focal_cc <- cc_cl |>
+  focal(w = 15, fun = "mean")
+
+evh_raw <- rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif")
+
+evh_c <- cats(evh_raw)[[1]] |>
+  mutate(
+    height_m = str_extract(CLASSNAMES, "\\d+"),
+    height_m = ifelse(is.na(height_m), 0, height_m) |>
+      as.numeric()
+  )
+
+levels(evh_raw) <- list(evh_c)
+
+activeCat(evh_raw) <- "height_m"
+
+crd_bd_cl3 <- area |>
+  st_transform(crs(evh_raw))
+
+evh_cl<-evh_raw |>
+  crop(crd_bd_cl3, mask=T) |>
+  project(cc_cl)
+
+evt_raw<-rast(tar_read(landfire_evt_file))
+
+levels(evt_raw)<-tar_read(evt_gp_n_grouped_level)
+
+evt<-evt_raw |>
+  crop(crd_bd_cl3) |>
+  project(cc_cl)
+
+sclass<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif") |>
+    crop(crd_bd_cl3) |>
+    project(cc_cl) 
+
+  activeCat(sclass)<-"DESCRIPTIO"
+
+
+
+
+
+
+d_bd_cl <- d_bd |>
+  st_transform(crs(t))
+
+t_cl <- t |>
+  crop(d_bd_cl, mask = T)
+
+d_bd_cl2 <- d_bd |>
+  st_transform(crs(cc_cl))
+
+cc_cl <- cc_cl |>
+  crop(d_bd_cl2, mask = T)
+
+t_cl_p2 <- project(t_cl, cc_cl)
+
+cov_rast_dolores <- c(t_cl_p2, cc_cl)
+
+
+predict_dolores <- predict_raster(nest_ensamble, cov_rast_dolores)
+```
+### CRD Predict
+```{r}
+crd_covs<-get_covs_for_predict(crd_bd)
+names(crd_covs)
+
+plot(crd_covs[["slope"]])
+
+
+# writeRaster(crd_covs[["evt_gp_n_grouped"]], "output/model_covs_V3_evt_groups.tif", datatype="INT4S")
+
+nest_ensamble<-readRDS("output/model_V4.rds")
+
+nest_stacks<-readRDS("output/model_V4_stack.rds")
+
+nest_stacks |> str()
+
+predictions <- predict_raster(nest_ensamble, crd_covs)
+
+writeRaster(predictions, "output/model_V4_CRD.tif")
+
+predictions_stack <- predict_raster(nest_stacks, crd_covs, type="prob")
+
+writeRaster(predictions_stack, "output/model_V4_CRD_stack.tif", "INT4S")
+
+ggplot() +
+  geom_spatraster(data = predictions, aes(fill = mean)) +
+  scale_fill_viridis_b()
+```
+
+##  Dolores Predict
+```{r}
+d_bd <- sjnf_bd |>
+  filter(districtnumber == "05")
+
+dol_cov<-get_covs_for_predict(d_bd)
+
+dol_prediction<-predict_raster(nest_ensamble, dol_cov)
+
+writeRaster(dol_prediction, "output/mod_V4_Dolores.tif")
+```
+
+## Pagosa
+
+```{r}
+p_bd<-sjnf_bd |>
+  filter(districtnumber=="06")
+
+pag_covs<-get_covs_for_predict(p_bd)
+
+pag_prediction<-predict_raster(nest_ensamble, pag_covs)
+
+writeRaster(pag_prediction, "output/mod_V3_Pagosa.tif")
+```
+
+
+
+```{r}
+library(DALEX)
+
+cov_imp<-cov |>
+  as_tibble() |>
+  select(-geometry, -class)
+
+exp_mod<-explain_tidysdm(nest_ensamble, data=cov_imp)
+
+vip_ensamble<-model_parts(explainer=exp_mod)
+plot(vip_ensamble)
+```
+
+
+
+
+
+
+
+
+
+
+
+

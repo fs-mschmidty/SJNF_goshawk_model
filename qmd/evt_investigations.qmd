@@ -1,0 +1,397 @@
+---
+title: Investigating EVT and Nests
+date: 2025-03-04
+tags: []
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: true
+  message: false
+  warning: false
+  class-output: 'r'
+---
+```{r}
+library(sf)
+library(terra)
+library(tidyverse)
+library(targets)
+library(sjnftools)
+library(tidyterra)
+library(geotargets)
+library(recipes)
+```
+
+
+```{r}
+r <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+
+c_t <- crd_bd |>
+  st_transform(crs(r))
+
+model_area_cl <- tar_read(model_area) |>
+  st_transform(crs(r))
+
+activeCat(r) <- "EVT_ORDER"
+
+t <- r |>
+  crop(c_t, mask = T) |>
+  freq() |>
+  as_tibble() |>
+  group_by(value) |>
+  summarize(count = sum(count)) |>
+  ungroup()
+
+n <- tar_read(nogo_nest_sites) |>
+  st_transform(crs(r))
+
+evt_order <- terra::extract(r, n)
+y <- r
+
+activeCat(y) <- "EVT_GP_N"
+
+test <- c(y, r) |>
+  crop(c_t)
+
+l <- test |>
+  levels()
+
+cropped_raster <- r |>
+  crop(c_t)
+activeCat(cropped_raster) <- "EVT_GP_N"
+evt_gp_ncropped_raster |>
+  freq() |>
+  as_tibble()
+t <- cropped_raster |>
+  combineLevels()
+
+terra::droplevels(cropped_raster, layer = "")
+
+c[[1]] |>
+  as_tibble() |>
+  mutate(
+    vegetation = ifelse(EVT_LF == "Tree", EVT_GP_N, EVT_LF)
+  ) |>
+  select(Value, EVT_GP_N, EVT_LF, vegetation) |>
+  count(vegetation)
+
+c[[1]] |>
+  as_tibble() |>
+  count(EVT_GP_N)
+
+y |>
+  crop(c_t) |>
+  freq() |>
+  as_tibble() |>
+  count(value)
+
+c[[1]] |>
+  as_tibble() |>
+  filter(str_detect(EVT_GP_N, regex("fir|conifer|ponderosa", ignore_case = T))) |>
+  View()
+
+c_r <- r |>
+  crop(c_t)
+
+
+activeCat(c_r) <- "EVT_GP_N"
+
+evt_gp_n <- c_r |>
+  freq() |>
+  select(evt_gp_n = value)
+
+activeCat(c_r) <- "EVT_LF"
+
+evt_lf <- c_r |>
+  freq() |>
+  select(evt_lf = value)
+
+bind_cols(evt_gp_n, evt_lf) |>
+  as_tibble() |>
+  mutate(
+    vegetation = ifelse(evt_lf == "Tree", evt_gp_n, evt_lf)
+  ) |>
+  count(vegetation) |>
+  View()
+
+
+activeCat(c_y) <- "EVT_LF"
+
+c(c_y, c_r) |>
+  mutate(
+    test = ifelse(EVT_LF == "TREE", EVT_GP_N, EVT_LF)
+  ) |>
+  levels()
+
+l[[1]] |>
+  as_tibble() |>
+  count(EVT_GP_N)
+
+
+l[[2]] |>
+  as_tibble() |>
+  count(EVT_ORDER)
+
+test$EVT_GP_N
+
+test |>
+  values()
+
+
+
+evt_gp_n <- terra::extract(r, n)
+
+n |>
+  as_tibble() |>
+  bind_cols(evt_gp_n, evt_order) |>
+  filter(shape_stat != "RETIRED") |>
+  count(EVT_ORDER)
+
+n |>
+  as_tibble() |>
+  bind_cols(evt_gp_n, evt_order) |>
+  filter(shape_stat != "RETIRED") |>
+  count(EVT_GP_N)
+```
+
+Need to figure out how this works between the broader dataset and those overlapping nests. 
+```{r}
+r <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+
+new_level<-cats(r)[[1]] |> 
+  as_tibble() |> 
+  mutate(
+    EVT_GP_N = case_when(
+      EVT_LF != "Tree" ~ "Non-tree",
+      TRUE ~ EVT_GP_N
+    )
+  )  |>
+  select(Value,EVT_GP_N)
+
+levels(r)<-list(new_level)
+
+r
+
+n<-tar_read(psuedoabs) |>
+  st_transform(crs(r))
+
+activeCat(r)<-"EVT_GP_N"
+
+evt_gp_n<-terra::extract(r,n) |>
+  as_tibble()
+
+new_evt_tree_cl<-n |>
+  as_tibble() |>
+  bind_cols(evt_gp_n) |> 
+  mutate(
+    evt_gp_n_cl = case_when(
+    EVT_GP_N %in% c("Western Riparian Woodland and Shrubland","Pinyon-Juniper Woodland", "Limber Pine Woodland", "Douglas-fir Forest and Woodland", "Developed-Upland Evergreen Forest", "Mountain Mahogany Woodland and Shrubland") ~ "Other Forest",
+    EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~ "Aspen Forest, Woodland, and Parkland",
+      TRUE~EVT_GP_N
+    )
+  )  |>
+  select(EVT_GP_N, evt_gp_n_cl) |>
+  count(EVT_GP_N, evt_gp_n_cl)
+
+
+r2 <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+
+cats(r2)[[1]] |>
+  as_tibble() |>
+  mutate(
+    EVT_GP_N = case_when(
+      EVT_LF != "Tree" ~ "Non-tree",
+      TRUE ~ EVT_GP_N
+    )
+  )  |>
+  left_join(new_evt_tree_cl, by="EVT_GP_N") |>
+  mutate(
+    evt_gp_n_cl = case_when(
+      is.na(evt_gp_n_cl)~"Other Forest",
+      TRUE~evt_gp_n_cl
+    )
+  ) |> 
+  select(Value,evt_gp_n_cl)
+  
+  
+
+r_c<-r |>
+  crop(ext(n))
+
+new_c<-cats(r_c)[[1]] |>
+  as_tibble() |>
+  mutate(veg_class = case_when(
+    EVT_LF!="Tree" ~ "Non-tree",
+    EVT_GP_N %in% c("Western Riparian Woodland and Shrubland","Pinyon-Juniper Woodland", "Limber Pine Woodland", "Douglas-fir Forest and Woodland", "Developed-Upland Evergreen Forest", "Mountain Mahogany Woodland and Shrubland") ~ "Other Forest",
+    EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~ "Aspen Forest, Woodland, and Parkland",
+    TRUE ~ EVT_GP_N
+  )) |>
+  select(Value, EVT_LF,veg_class) 
+
+cats(r_c)[[1]] |>
+  as_tibble() |> 
+  mutate(
+    saf_srm_cl = str_replace(SAF_SRM, "^(LF|SRM|SAF) \\d+: ", ""),
+    saf_srm_cl = case_when(
+      EVT_LF!="Tree"~EVT_LF,
+      TRUE ~ saf_srm_cl
+    )
+  ) |> 
+  count(saf_srm_cl) |> 
+  View()
+
+new_c |>
+  count(EVT_LF,veg_class) |>
+  View()
+
+i<-new_c |>
+  recipe(Value~veg_class) |>
+  step_dummy(veg_class)
+
+dummy<-prep(i) |>
+  bake(new_data=NULL)
+
+levels(r)<-list(c)
+
+e<-n |>
+  bind_cols(terra::extract(r,n)) |>
+  as_tibble()
+
+e |>
+  count(class,veg_class) |>
+  arrange(veg_class) |>
+  View()
+
+
+c |>
+  count(veg_class)
+```
+
+
+Keep in the "RETIRED" NESTS potentially. 
+
+```{r}
+m_a <- tar_read(model_area) |>
+  st_transform(st_crs(n))
+
+cc <- tar_read(tar_load_clip_tree_canopy_cover)
+elev <- tar_read(elevation)
+
+cc_dt <- n |>
+  st_transform(crs(cc)) %>%
+  terra::extract(cc, .) |>
+  rename(canopy_cover = Layer_1) |>
+  select(canopy_cover)
+
+elev_dt <- n |>
+  st_transform(crs(elev)) %>%
+  terra::extract(elev, .)
+
+n |>
+  bind_cols(evt_gp_n, evt_order, cc_dt) |>
+  st_intersection(m_a)
+as_tibble() |>
+  filter(EVT_ORDER != "Tree-dominated") |>
+  count(forestname)
+```
+
+```{r}
+comb <- n |>
+  bind_cols(evt_gp_n, evt_order, cc_dt, elev_dt)
+st_intersection(m_a) |>
+  as_tibble()
+
+comb |>
+  ggplot(aes(canopy_cover)) +
+  geom_histogram()
+
+
+comb |>
+  ggplot(aes(elevation)) +
+  geom_histogram()
+
+
+comb |>
+  ggplot(aes(slope)) +
+  geom_histogram()
+comb |>
+  ggplot(aes(aspect)) +
+  geom_histogram()
+comb |>
+  ggplot(aes(TPI)) +
+  geom_histogram()
+
+comb |>
+  ggplot(aes(TRI)) +
+  geom_histogram()
+```
+
+It might be a good idea to filter out all nests with 0 canopy cover to build the model. 
+
+## Looking at height
+
+```{r}
+h <- rast("D:\\GIS_Data\\Landfire\\LF2022_CH_230_CONUS\\LF2022_CH_230_CONUS\\Tif\\LC22_CH_230.tif")
+activeCat(h) <- "METERS"
+r2_bd_cl <- r2_bd |>
+  st_transform(crs(h))
+h_crop <- h |>
+  crop(r2_bd_cl)
+
+
+f <- h_crop |>
+  freq() |>
+  as_tibble()
+
+height <- terra::extract(h, n)
+
+height |>
+  as_tibble() |>
+  count(METERSX10) |>
+  mutate(METERS = fct_reorder(METERSX10, n)) |>
+  ggplot(aes(METERSX10, n)) +
+  geom_col() +
+  coord_flip()
+
+
+evh<-rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif") |>
+  crop(r2_bd_cl)
+
+l<-levels(evh)
+c<-cats(evh)[[1]] |>
+  mutate(
+    meters_h = str_extract(CLASSNAMES, "\\d+"),
+    meters_h = ifelse(is.na(meters_h), 0, meters_h) |>
+      as.numeric()
+  )  
+
+new_cat<-l[[1]] |>
+  mutate(
+    meters_h = str_extract(CLASSNAMES, "\\d+"),
+    meters_h = ifelse(is.na(meters_h), 0, meters_h) |>
+      as.numeric()
+  ) |>
+  select(Value,meters_h)
+
+levels(evh)<-list(c)
+activeCat(evh)<-"meters_h"
+evh
+plot(evh)
+```
+
+## SClass examples
+```{r}
+r<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif")
+
+sclass<-r |>
+  crop(c_t)
+
+cats(sclass)[[1]] |>
+  as_tibble() |>
+  View()
+```
+
+
+
+
