@@ -1,5 +1,5 @@
 ---
-title: Build NOGO MOdel
+title: Build NOGO Model
 date: 2025-03-07
 tags: []
 format: 
@@ -45,7 +45,7 @@ nest_models <-
     preproc = list(default = nest_rec),
     models = list(
       # the standard glm specs
-      glm = sdm_spec_glm(),
+      # glm = sdm_spec_glm(),
       # rf specs with tuning
       rf = sdm_spec_rf(),
       # boosted tree model (gbm) specs with tuning
@@ -75,7 +75,7 @@ nest_models <- nest_models |>
   workflow_map(
     "tune_grid",
     resamples = nest_cv,
-    grid = 15,
+    grid = 25,
     metrics = sdm_metric_set(),
     verbose = T
   )
@@ -88,7 +88,7 @@ autoplot(nest_models)
 nest_ensamble <- simple_ensemble() |>
   add_member(nest_models, metric = "boyce_cont")
 
-saveRDS(nest_ensamble, "output/model_V4.rds")
+saveRDS(nest_ensamble, "output/model_V5.rds")
 
 autoplot(nest_ensamble)
 ```
@@ -103,7 +103,7 @@ nest_stack<-stacks() |>
 
 autoplot(nest_stack, type="weights")
 
-saveRDS(nest_stack, "output/model_V4_stack.rds")
+saveRDS(nest_stack, "output/model_V5_stack.rds")
 ```
 
 
@@ -129,7 +129,7 @@ cc_cl <- cc |>
 t_cl_p <- project(t_cl, cc_cl)
 
 focal_cc <- cc_cl |>
-  focal(w = 15, fun = "mean")
+  focal(w = 11, fun = "mean")
 
 evh_raw <- rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif")
 
@@ -168,82 +168,6 @@ sclass<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240
 cov_rast <- c(t_cl_p, cc_cl, focal_cc, evh_cl, evt, sclass)
   cov_rast
 }
-area<-crd_bd
-t <- tar_read(terrain)
-crd_bd_cl <- area |>
-  st_transform(crs(t))
-t_cl <- t |>
-  crop(crd_bd_cl, mask = T)
-
-cc <- tar_read(tar_load_clip_tree_canopy_cover)
-names(cc) <- "canopy_cover"
-
-crd_bd_cl2 <- area |>
-  st_transform(crs(cc))
-
-cc_cl <- cc |>
-  crop(crd_bd_cl2, mask = T)
-
-t_cl_p <- project(t_cl, cc_cl)
-
-focal_cc <- cc_cl |>
-  focal(w = 15, fun = "mean")
-
-evh_raw <- rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif")
-
-evh_c <- cats(evh_raw)[[1]] |>
-  mutate(
-    height_m = str_extract(CLASSNAMES, "\\d+"),
-    height_m = ifelse(is.na(height_m), 0, height_m) |>
-      as.numeric()
-  )
-
-levels(evh_raw) <- list(evh_c)
-
-activeCat(evh_raw) <- "height_m"
-
-crd_bd_cl3 <- area |>
-  st_transform(crs(evh_raw))
-
-evh_cl<-evh_raw |>
-  crop(crd_bd_cl3, mask=T) |>
-  project(cc_cl)
-
-evt_raw<-rast(tar_read(landfire_evt_file))
-
-levels(evt_raw)<-tar_read(evt_gp_n_grouped_level)
-
-evt<-evt_raw |>
-  crop(crd_bd_cl3) |>
-  project(cc_cl)
-
-sclass<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif") |>
-    crop(crd_bd_cl3) |>
-    project(cc_cl) 
-
-  activeCat(sclass)<-"DESCRIPTIO"
-
-
-
-
-
-
-d_bd_cl <- d_bd |>
-  st_transform(crs(t))
-
-t_cl <- t |>
-  crop(d_bd_cl, mask = T)
-
-d_bd_cl2 <- d_bd |>
-  st_transform(crs(cc_cl))
-
-cc_cl <- cc_cl |>
-  crop(d_bd_cl2, mask = T)
-
-t_cl_p2 <- project(t_cl, cc_cl)
-
-cov_rast_dolores <- c(t_cl_p2, cc_cl)
-
 
 predict_dolores <- predict_raster(nest_ensamble, cov_rast_dolores)
 ```
@@ -263,13 +187,39 @@ nest_stacks<-readRDS("output/model_V4_stack.rds")
 
 nest_stacks |> str()
 
+nest_stacks_predictions<-predict_raster(nest_stack, crd_covs, type="prob")
+
+writeRaster(nest_stacks_predictions, "output/model_V5_CRD_Stacks.tif")
+
 predictions <- predict_raster(nest_ensamble, crd_covs)
 
-writeRaster(predictions, "output/model_V4_CRD.tif")
+writeRaster(predictions, "output/model_V5_CRD.tif")
 
-predictions_stack <- predict_raster(nest_stacks, crd_covs, type="prob")
+crd_mod<-rast("output/model_V4_CRD.tif")
 
-writeRaster(predictions_stack, "output/model_V4_CRD_stack.tif", "INT4S")
+cat_crd_mod<-crd_mod |>
+  mutate(hab_cat = case_when(
+    mean>0.80 ~ "Very Likely",
+    mean>0.60 ~ "Likely",
+    TRUE ~ "Not Likely"
+  ))
+
+factor_cat_crd_mod<-cat_crd_mod[["hab_cat"]] |>
+  as.factor()
+new_levels<-cat_crd_mod[["hab_cat"]] |>
+  levels()
+new_levels_2<-new_levels[[1]] |>
+  mutate(hab_cats = label)
+
+levels(factor_cat_crd_mod)<-new_levels_2
+
+activeCat(factor_cat_crd_mod)<-"hab_cats"
+
+factor_cat_crd_mod |> 
+  writeRaster("output/model_V4_CRD_categorized.tif", datatype="INT4U", overwrite=T)
+
+foreign::write.dbf(new_levels, "output/model_V4_CRD_categorized.tif.vat.dbf")
+
 
 ggplot() +
   geom_spatraster(data = predictions, aes(fill = mean)) +
@@ -283,9 +233,38 @@ d_bd <- sjnf_bd |>
 
 dol_cov<-get_covs_for_predict(d_bd)
 
+dol_prediction_stack<-predict_raster(nest_stack, dol_cov, type="prob")
+
+writeRaster(dol_prediction_stack, "output/mod_V5_Dolores_stack.tif")
+
 dol_prediction<-predict_raster(nest_ensamble, dol_cov)
 
-writeRaster(dol_prediction, "output/mod_V4_Dolores.tif")
+writeRaster(dol_prediction, "output/mod_V5_Dolores.tif")
+
+dol_mod<-rast("output/mod_V5_Dolores.tif")
+
+cat_dol_mod<-dol_mod |>
+  mutate(hab_cat = case_when(
+    mean>0.80 ~ "Very Likely",
+    mean>0.60 ~ "Likely",
+    TRUE ~ "Not Likely"
+  ))
+
+factor_cat_dol_mod<-cat_dol_mod[["hab_cat"]] |>
+  as.factor() 
+
+new_levels<-cat_dol_mod[["hab_cat"]] |>
+  levels()
+new_levels_2<-new_levels[[1]] |>
+  mutate(hab_cats = label)
+
+levels(factor_cat_dol_mod)<-new_levels_2
+
+activeCat(factor_cat_dol_mod)<-"hab_cats"
+
+factor_cat_dol_mod |> 
+  writeRaster("output/mod_V4_dol_categorized.tif", datatype="INT4U", overwrite=T)
+
 ```
 
 ## Pagosa
@@ -298,14 +277,36 @@ pag_covs<-get_covs_for_predict(p_bd)
 
 pag_prediction<-predict_raster(nest_ensamble, pag_covs)
 
-writeRaster(pag_prediction, "output/mod_V3_Pagosa.tif")
+writeRaster(pag_prediction, "output/mod_V5_Pagosa.tif")
+```
+
+## Rio Grande
+```{r}
+divide_rd<-r2_bd |>
+  filter(forestnumber=="09" & districtnumber=="07")
+
+divide_covs<-get_covs_for_predict(divide_rd)
+
+divide_pred<-predict_raster(nest_ensamble, divide_covs)
+
+writeRaster(divide_pred, "output/mod_V4_RioGrande.tif")
 ```
 
 
+```{r}
+gunn_rd<-r2_bd |>
+  filter(forestnumber=="09" )
+
+divide_covs<-get_covs_for_predict(gunn_rd)
+
+divide_pred<-predict_raster(nest_ensamble, divide_covs)
+
+writeRaster(divide_pred, "output/mod_V4_RioGrande.tif")
+```
 
 ```{r}
 library(DALEX)
-
+library(DALEXtra)
 cov_imp<-cov |>
   as_tibble() |>
   select(-geometry, -class)
@@ -314,6 +315,12 @@ exp_mod<-explain_tidysdm(nest_ensamble, data=cov_imp)
 
 vip_ensamble<-model_parts(explainer=exp_mod)
 plot(vip_ensamble)
+
+exp_mod_stack<-explain_tidymodels(nest_stack, data=cov_imp, y=cov$class)
+
+vip_ensamble_stack<-model_parts(explainer=exp_mod_stack)
+plot(vip_ensamble_stack)
+
 ```
 
 

@@ -2,37 +2,32 @@ name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iterat
 tree_canopy_cover_file|stem|243b9b6f7d7603f7|b6cdbf838b1d669a|2c530c1562a7fbd1|1344127665||t20151.0091030598s|s131b|131|qs|local|vector|||6.218|package tidyverse was built under R version 4.3.2. package ggplot2 was built under R version 4.3.3. package dplyr was built under R version 4.3.2. package stringr was built under R version 4.3.2. package lubridate was built under R version 4.3.2. package terra was built under R version 4.3.3|
 epsg|stem|33fd151cecbf0716|13e6250137e8483e|2c530c1562a7fbd1|-2034763483||t20152.9323720933s|s86b|86|qs|local|vector|||0.79||
 proj|stem|aedb941879e11167|fba71ef8a1bed4a5|2c530c1562a7fbd1|-1626447702||t20152.9323724569s|s94b|94|qs|local|vector|||0||
-tar_load_clip_tree_canopy_cover|stem|ffbe3fae083a16f9|5136ecef919ee65b|f8685b159be5db21|1642173746||t20152.9414375293s|s238119092b|238119092|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||748.52||
-landfire_evt|stem|038a648107651837|454bbb300025bf0b|e4aa1545a3a5fb52|-1400629232||t20151.7228675417s||367647909|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||0.03||unused argument projection  proj
-landfire_evt_lf|stem|bd3e5c54da917b9e|3d5e92fd7610b115|f5c7400d2c21c8e5|-1259215852||t20153.8429834548s|s104338407b|104338407|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||66.17||
-landfire_evt_gp_n|stem|5856b0419378776e|a3ff3bba1310e765|f5c7400d2c21c8e5|-1654951130||t20153.8440106251s|s104338411b|104338411|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||59.36||
-get_coveriates|function|620e0bad9ea5ed4f|||||||||||||||
 landfire_evt_file|stem|63ccd710f48c662c|23d49dc20472bb2b|2c530c1562a7fbd1|1756613045||t20154.7059721036s|s134b|134|qs|local|vector|||4.55||
-elevation|stem|5bc067f80f427c01|a0ed5bc36c85bb3e|49034100637b0709|223776802||t20152.9429333619s||782978335|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||0.65||error in evaluating the argument x in selecting a method for function rast stdbad_alloc
-terrain|stem|8302ddb9c87e3c92|65a059ba052934f8|a137e0f83fde2c2b|218004625||t20154.7231861855s|s2400551730b|2400551730|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||315.08||
-cov_raster|stem||76429c475cfd4b59|1cad8e3f944daf2d|102568468||t20157.9043238815s||0|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||0.01||could not find function build_cov_raster
-nogo_nest_sites|stem|740458670bb9ab73|8bb96138eab49b6c|c5a686adf6b143fe|-581332590||t20164.9467795551s|s121098b|121098|qs|local|vector|||0.42|st_centroid assumes attributes are constant over geometries|
-model_area|stem|41c2bca59317b210|8b81533450e1ae1d|c7127306f1e855ae|1874178776||t20164.9475411369s|s3393315b|3393315|qs|local|vector|||4.14|attribute variables are assumed to be spatially constant throughout all geometries|
-psuedoabs|stem|78d806c7ed52a10a|1904de50a71eede2|a0b15ad9b3796303|2049962376||t20164.9513007228s|s29078b|29078|qs|local|vector|||324.65||
-surrounding_canopy_cover|stem|10915ba2ffded350|f02d4188ebb75ad0|5f8b0aaa9ca3f239|-172486036||t20164.9618665216s|s7423b|7423|qs|local|vector|||869.53||
-canopy_cover|stem|f424cf681e498ec7|5669a319fcd5ff1a|1ec64e72b5281b18|752378385||t20164.9621006421s|s3119b|3119|qs|local|vector|||20.14||
-evt_height|stem|122e0bccea774bda|2ab5240dac2a7bed|e926df11ee6d62e8|-1984632885||t20164.9621704242s|s2289b|2289|qs|local|vector|||5.97||
-terrain_cov|stem|aa430221fef07238|0553fc9be79989d3|0ff62810199cdb25|709168210||t20164.9622106106s|s26765b|26765|qs|local|vector|||3.31||
-evt_gp_n|stem|bf634a02ba5ff2d7|f91e4ff084742ffb|96a46b141f73eed1|1841834064||t20164.9622400562s|s3579b|3579|qs|local|vector|||2.48||
-evt_lf|stem|16bfcbacc6c1e0ce|0bad9541fbc4a931|96a46b141f73eed1|-964904890||t20164.9622440905s|s1173b|1173|qs|local|vector|||0.29||
-sclass|stem|0b1010a98bc06261|f72a05cdc0947fe2|605e2410bada3c03|632978036||t20165.8423737444s|s1898b|1898|qs|local|vector|||19.49||
-evt_gp_n_grouped_level|stem|ddf751059e9f8d10|e7cf0364f5a75740|65540dbefbc16b50|-35177554||t20165.843473886s|s2259b|2259|qs|local|vector|||19.95||
-evt_gp_n_grouped|stem|6d9bcf4c634a75ef|f4392b22065722c5|b2776eb0feafda35|1559649924||t20165.8434772436s|s1860b|1860|qs|local|vector|||0.23||
+terrain|stem|dfb6fe4851763d25|65a059ba052934f8|6031dc69ce109ba6|218004625||t20172.7910019737s|s2389874226b|2389874226|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||434.58||
+nogo_nest_sites|stem|5e8d0afa55c71a0c|8bb96138eab49b6c|6092cc8c617b4755|-581332590||t20172.7993759009s|s61565b|61565|qs|local|vector|||0.58|st_centroid assumes attributes are constant over geometries|
+model_area|stem|2751a784074f1f6c|8b81533450e1ae1d|45406fe66ad159f8|1874178776||t20172.7993824946s|s2637738b|2637738|qs|local|vector|||0.48|attribute variables are assumed to be spatially constant throughout all geometries|
+tar_load_clip_tree_canopy_cover|stem|ffbe3fae083a16f9|5136ecef919ee65b|f1927385841c33eb|1642173746||t20172.8185378725s|s238119092b|238119092|format_custom&read=dGVycmE6OnJhc3QocGF0aCk&write=ewogICAgdGVycmE6OndyaXRlUmFzdGVyKG9iamVjdCwgZmlsZW5hbWUgPSBwYXRoLCBmaWxldHlwZSA9ICJHVGlmZiIsIAogICAgICAgIG92ZXJ3cml0ZSA9IFRSVUUsIGdkYWwgPSBOVUxMKQp9&marshal=dGVycmE6OndyYXAob2JqZWN0KQ&unmarshal=dGVycmE6OnVud3JhcChvYmplY3Qp&convert=&copy=&repository=|local|list|||854.91||
+thinned_nest_sites|stem|8dc079f5138aae66|98062340468bd735|fcf9ed71652e2cd3|-530730015||t20172.8284836175s|s61432b|61432|qs|local|vector|||82.46||
 get_covariates|function|ecf158de6ec80b4c
-get_evt_height_covariat|function|cb47509066651757
+get_evt_height_covariat|function|0809d1edfd89aa13
 load_clip_tree_canopy_cover|function|1a690c3a0b10ecf0
-build_surrounding_canopy_cover|function|e96c6f82a0b7516b
+build_surrounding_canopy_cover|function|15a088b2dc548fb6
 build_model_area|function|76508133af6fee82
 .Random.seed|object|dd5b3c3862d4dca6
 generate_psuedoabsence|function|d5a75a6ffe61b288
 get_elevation_data|function|410da37cbc4a4a68
 load_landfire_evt|function|c520ff04b72ae56d
-load_and_clean_nogo_nests|function|7031b6e4c6d0d9f4
+load_and_clean_nogo_nests|function|b72bd03269ac5388
 build_evt_gp_n_grouped_level|function|9ae10afb949e3ed9
 evt_extract|function|bfe211b44eed04a5
-all_covs|stem|627d939f76aa706c|0dfdb95f19e8575a|bdba53c78c117d91|-1195115831||t20165.8445860885s|s71612b|71612|qs|local|vector|||0.03||
+psuedoabs|stem|e8ee18081e79bfb3|5d94f4fe63e652b4|2f8b53bc5d0ee64d|2049962376||t20172.8414288045s|s22363b|22363|qs|local|vector|||339.25||
+evt_gp_n_grouped_level|stem|535d8da6db1f8b41|e7cf0364f5a75740|65242467eeb33677|-35177554||t20172.8416603375s|s2249b|2249|qs|local|vector|||19.91||
+surrounding_canopy_cover|stem|7c91af9f00cc0dc0|f02d4188ebb75ad0|2b676831c982952e|-172486036||t20172.8462331298s|s5585b|5585|qs|local|vector|||394.99||
+canopy_cover|stem|d88e4118be025339|5669a319fcd5ff1a|72cb0e08dbf84fb8|752378385||t20172.8464666083s|s2564b|2564|qs|local|vector|||19.93||
+evt_height|stem|717460f1c1dbe6e6|2ab5240dac2a7bed|21434c54958b17a8|-1984632885||t20172.8465259921s|s1868b|1868|qs|local|vector|||4.95||
+sclass|stem|dde9c4e49d296cc7|f72a05cdc0947fe2|e93ab9abf98de638|632978036||t20172.8465582212s|s1586b|1586|qs|local|vector|||2.68||
+terrain_cov|stem|3e796616fa8090f0|0553fc9be79989d3|d2bc79ff4c32eb60|709168210||t20172.8466219426s|s20741b|20741|qs|local|vector|||5.36||
+evt_gp_n|stem|a90b397a6a6aea98|f91e4ff084742ffb|62cee7c494b5bc71|1841834064||t20172.8466495999s|s3233b|3233|qs|local|vector|||2.26||
+evt_lf|stem|f37a7a6cc15373ea|0bad9541fbc4a931|62cee7c494b5bc71|-964904890||t20172.8466559911s|s1056b|1056|qs|local|vector|||0.45||
+evt_gp_n_grouped|stem|5a0a977b6d8fc55e|f4392b22065722c5|c2ba574994f2fd79|1559649924||t20172.8466632424s|s1530b|1530|qs|local|vector|||0.53||
+all_covs|stem|132e4831b70a25fa|0dfdb95f19e8575a|1947d1e317b49709|-1195115831||t20172.8466654014s|s59651b|59651|qs|local|vector|||0.08||

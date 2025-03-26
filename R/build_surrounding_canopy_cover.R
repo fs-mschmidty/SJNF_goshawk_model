@@ -8,7 +8,7 @@ build_surrounding_canopy_cover <- function(x, model_points) {
     crop(ext(model_points_cl))
 
   wind_c <- cc_cl |>
-    focal(w = 15, fun = "mean")
+    focal(w = 11, fun = "mean")
 
   r_points <- terra::extract(wind_c, model_points_cl) |>
     as_tibble()

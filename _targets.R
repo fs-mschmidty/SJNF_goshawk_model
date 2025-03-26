@@ -43,6 +43,10 @@ list(
     load_and_clean_nogo_nests("data/NorthernGoshawk_R2_NRM_20230731.shp", epsg)
   ),
   tar_target(model_area, build_model_area(r2_bd, nogo_nest_sites, epsg)),
+  tar_terra_rast(
+    terrain,
+    get_elevation_data(model_area)
+  ),
   tar_target(
     tree_canopy_cover_file,
     "D:\\GIS_Data\\NLCD\\nlcd_tcc_CONUS_2021_v2021-4\\nlcd_tcc_conus_2021_v2021-4.tif"
@@ -60,14 +64,25 @@ list(
     )
   ),
   tar_target(
+    thinned_nest_sites,
+    tidysdm::thin_by_cell(
+      sf::st_transform(nogo_nest_sites, crs(terrain)),
+      terrain
+    )
+  ),
+  tar_target(
     psuedoabs,
     sample_pseudoabs(
-      nogo_nest_sites,
+      thinned_nest_sites,
       tar_load_clip_tree_canopy_cover,
       1000,
       method = c("dist_disc", 2500, 10000)
     ) |>
       mutate(id = row_number())
+  ),
+  tar_target(
+    terrain_cov,
+    get_covariates(terrain, psuedoabs, cat = FALSE)
   ),
   tar_target(
     canopy_cover,
@@ -129,14 +144,6 @@ list(
   #     "EVT_LF"
   #   )
   # ),
-  tar_terra_rast(
-    terrain,
-    get_elevation_data(model_area)
-  ),
-  tar_target(
-    terrain_cov,
-    get_covariates(terrain, psuedoabs, cat = FALSE)
-  ),
   tar_target(
     all_covs,
     psuedoabs |>
