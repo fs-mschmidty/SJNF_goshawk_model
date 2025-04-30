@@ -26,7 +26,9 @@ tar_option_set(
     "elevatr",
     "janitor",
     "geotargets",
-    "tidysdm"
+    "tidysdm",
+    "arcgislayers",
+    "tidymodels"
   ), # packages that your targets need to run
   format = "qs", # Optionally set the default storage format. qs is fast.
 )
@@ -40,7 +42,11 @@ list(
   ## Need to centroid the nests they are currently polygons.
   tar_target(
     nogo_nest_sites,
-    load_and_clean_nogo_nests("data/NorthernGoshawk_R2_NRM_20230731.shp", epsg)
+    load_and_clean_nogo_nests(
+      "data/NorthernGoshawk_R2_NRM_20230731.shp",
+      epsg,
+      year_cutoff = 2018
+    )
   ),
   tar_target(model_area, build_model_area(r2_bd, nogo_nest_sites, epsg)),
   tar_terra_rast(
@@ -122,28 +128,11 @@ list(
   ),
   tar_target(
     sclass,
-    get_covariates(
+    get_covariates_sclass(
       "D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif",
-      psuedoabs,
-      cat = "DESCRIPTIO"
+      psuedoabs
     )
   ),
-  # tar_terra_rast(
-  #   landfire_evt_gp_n,
-  #   load_landfire_evt(
-  #     "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif",
-  #     model_area,
-  #     "EVT_GP_N"
-  #   )
-  # ),
-  # tar_terra_rast(
-  #   landfire_evt_lf,
-  #   load_landfire_evt(
-  #     "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif",
-  #     model_area,
-  #     "EVT_LF"
-  #   )
-  # ),
   tar_target(
     all_covs,
     psuedoabs |>
@@ -153,9 +142,88 @@ list(
       left_join(surrounding_canopy_cover, by = "id") |>
       left_join(evt_gp_n_grouped, by = "id") |>
       left_join(sclass, by = "id")
-  )
+  ),
+  tar_target(
+    nogo_nest_model,
+    build_nogo_nest_model(all_covs)
+  ),
+  tar_target(
+    nogo_nest_model_output,
+    save_nogo_nest_model(nogo_nest_model)
+  ),
+  tar_terra_rast(
+    crd_covs,
+    get_covs_for_predict(
+      area = crd_bd,
+      evt_gps = evt_gp_n_grouped_level,
+      proj = epsg
+    ),
+    datatype = "INT4S"
+  ),
   # tar_terra_rast(
-  #   cov_raster,
-  #   build_cov_raster(terrain, tar_load_clip_tree_canopy_cover)
-  # )
+  #   crd_prediction,
+  #   predict_raster(nogo_nest_model, crd_covs)
+  # ),
+  tar_target(
+    r3_nogo_nests,
+    load_and_clean_nogo_nests(
+      "data/R3_Accipiters_04032025.shp",
+      epsg,
+      year_cutoff = 2005
+    ) |>
+      filter(str_detect(sci_name, "atricapillus|gentilis"))
+  ),
+  tar_target(
+    r3_boundaries,
+    arc_open(
+      "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RangerDistricts_03/MapServer/1"
+    ) |>
+      arc_select(where = "REGION='03'")
+  ),
+  tar_target(
+    r3_testing_forests,
+    r3_boundaries |>
+      select(FORESTNAME, DISTRICTNAME, RANGERDISTRICTID) |>
+      st_transform(st_crs(r3_nogo_nests)) |>
+      st_intersection(select(
+        r3_nogo_nests,
+        sci_name,
+        last_visit,
+        last_vis_4,
+        shape_stat
+      ))
+  ),
+  tar_target(
+    r3_testing_rd_id,
+    r3_testing_forests |>
+      as_tibble() |>
+      count(FORESTNAME, DISTRICTNAME, RANGERDISTRICTID, sort = T) |>
+      filter(n > 10) |>
+      pull(RANGERDISTRICTID)
+  ),
+  tar_target(
+    test_boundary,
+    r3_boundaries |>
+      filter(RANGERDISTRICTID == r3_testing_rd_id[1])
+  ),
+  tar_terra_rast(
+    test_covs,
+    get_covs_for_predict(
+      area = test_boundary,
+      evt_gp_n_grouped_level,
+      proj = epsg
+    )
+  ),
+  # tar_terra_rast(
+  tar_target(
+    carson_model,
+    get_rd_prediction(
+      model_path = "output/model_V5.rds",
+      rds = r3_boundaries,
+      rd_id = r3_testing_rd_id[[1]],
+      terrain_model = terrain,
+      canopy_cover = tar_load_clip_tree_canopy_cover,
+      evt_gp_n_new_level = evt_gp_n_grouped_level
+    )
+  )
 )

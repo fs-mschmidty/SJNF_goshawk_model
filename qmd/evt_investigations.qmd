@@ -25,7 +25,9 @@ library(recipes)
 
 
 ```{r}
-r <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+r <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif"
+)
 
 c_t <- crd_bd |>
   st_transform(crs(r))
@@ -88,7 +90,10 @@ y |>
 
 c[[1]] |>
   as_tibble() |>
-  filter(str_detect(EVT_GP_N, regex("fir|conifer|ponderosa", ignore_case = T))) |>
+  filter(str_detect(
+    EVT_GP_N,
+    regex("fir|conifer|ponderosa", ignore_case = T)
+  )) |>
   View()
 
 c_r <- r |>
@@ -139,7 +144,6 @@ test |>
   values()
 
 
-
 evt_gp_n <- terra::extract(r, n)
 
 n |>
@@ -157,45 +161,59 @@ n |>
 
 Need to figure out how this works between the broader dataset and those overlapping nests. 
 ```{r}
-r <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+r <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif"
+)
 
-new_level<-cats(r)[[1]] |> 
-  as_tibble() |> 
+new_level <- cats(r)[[1]] |>
+  as_tibble() |>
   mutate(
     EVT_GP_N = case_when(
       EVT_LF != "Tree" ~ "Non-tree",
       TRUE ~ EVT_GP_N
     )
-  )  |>
-  select(Value,EVT_GP_N)
+  ) |>
+  select(Value, EVT_GP_N)
 
-levels(r)<-list(new_level)
+levels(r) <- list(new_level)
 
 r
 
-n<-tar_read(psuedoabs) |>
+n <- tar_read(psuedoabs) |>
   st_transform(crs(r))
 
-activeCat(r)<-"EVT_GP_N"
+activeCat(r) <- "EVT_GP_N"
 
-evt_gp_n<-terra::extract(r,n) |>
+evt_gp_n <- terra::extract(r, n) |>
   as_tibble()
 
-new_evt_tree_cl<-n |>
+new_evt_tree_cl <- n |>
   as_tibble() |>
-  bind_cols(evt_gp_n) |> 
+  bind_cols(evt_gp_n) |>
   mutate(
     evt_gp_n_cl = case_when(
-    EVT_GP_N %in% c("Western Riparian Woodland and Shrubland","Pinyon-Juniper Woodland", "Limber Pine Woodland", "Douglas-fir Forest and Woodland", "Developed-Upland Evergreen Forest", "Mountain Mahogany Woodland and Shrubland") ~ "Other Forest",
-    EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~ "Aspen Forest, Woodland, and Parkland",
-      TRUE~EVT_GP_N
+      EVT_GP_N %in%
+        c(
+          "Western Riparian Woodland and Shrubland",
+          "Pinyon-Juniper Woodland",
+          "Limber Pine Woodland",
+          "Douglas-fir Forest and Woodland",
+          "Developed-Upland Evergreen Forest",
+          "Mountain Mahogany Woodland and Shrubland"
+        ) ~
+        "Other Forest",
+      EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~
+        "Aspen Forest, Woodland, and Parkland",
+      TRUE ~ EVT_GP_N
     )
-  )  |>
+  ) |>
   select(EVT_GP_N, evt_gp_n_cl) |>
   count(EVT_GP_N, evt_gp_n_cl)
 
 
-r2 <- rast("D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif")
+r2 <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif"
+)
 
 cats(r2)[[1]] |>
   as_tibble() |>
@@ -204,62 +222,73 @@ cats(r2)[[1]] |>
       EVT_LF != "Tree" ~ "Non-tree",
       TRUE ~ EVT_GP_N
     )
-  )  |>
-  left_join(new_evt_tree_cl, by="EVT_GP_N") |>
+  ) |>
+  left_join(new_evt_tree_cl, by = "EVT_GP_N") |>
   mutate(
     evt_gp_n_cl = case_when(
-      is.na(evt_gp_n_cl)~"Other Forest",
-      TRUE~evt_gp_n_cl
+      is.na(evt_gp_n_cl) ~ "Other Forest",
+      TRUE ~ evt_gp_n_cl
     )
-  ) |> 
-  select(Value,evt_gp_n_cl)
-  
-  
+  ) |>
+  select(Value, evt_gp_n_cl)
 
-r_c<-r |>
+
+r_c <- r |>
   crop(ext(n))
 
-new_c<-cats(r_c)[[1]] |>
+new_c <- cats(r_c)[[1]] |>
   as_tibble() |>
-  mutate(veg_class = case_when(
-    EVT_LF!="Tree" ~ "Non-tree",
-    EVT_GP_N %in% c("Western Riparian Woodland and Shrubland","Pinyon-Juniper Woodland", "Limber Pine Woodland", "Douglas-fir Forest and Woodland", "Developed-Upland Evergreen Forest", "Mountain Mahogany Woodland and Shrubland") ~ "Other Forest",
-    EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~ "Aspen Forest, Woodland, and Parkland",
-    TRUE ~ EVT_GP_N
-  )) |>
-  select(Value, EVT_LF,veg_class) 
+  mutate(
+    veg_class = case_when(
+      EVT_LF != "Tree" ~ "Non-tree",
+      EVT_GP_N %in%
+        c(
+          "Western Riparian Woodland and Shrubland",
+          "Pinyon-Juniper Woodland",
+          "Limber Pine Woodland",
+          "Douglas-fir Forest and Woodland",
+          "Developed-Upland Evergreen Forest",
+          "Mountain Mahogany Woodland and Shrubland"
+        ) ~
+        "Other Forest",
+      EVT_GP_N == "Aspen-Mixed Conifer Forest and Woodland" ~
+        "Aspen Forest, Woodland, and Parkland",
+      TRUE ~ EVT_GP_N
+    )
+  ) |>
+  select(Value, EVT_LF, veg_class)
 
 cats(r_c)[[1]] |>
-  as_tibble() |> 
+  as_tibble() |>
   mutate(
     saf_srm_cl = str_replace(SAF_SRM, "^(LF|SRM|SAF) \\d+: ", ""),
     saf_srm_cl = case_when(
-      EVT_LF!="Tree"~EVT_LF,
+      EVT_LF != "Tree" ~ EVT_LF,
       TRUE ~ saf_srm_cl
     )
-  ) |> 
-  count(saf_srm_cl) |> 
+  ) |>
+  count(saf_srm_cl) |>
   View()
 
 new_c |>
-  count(EVT_LF,veg_class) |>
+  count(EVT_LF, veg_class) |>
   View()
 
-i<-new_c |>
-  recipe(Value~veg_class) |>
+i <- new_c |>
+  recipe(Value ~ veg_class) |>
   step_dummy(veg_class)
 
-dummy<-prep(i) |>
-  bake(new_data=NULL)
+dummy <- prep(i) |>
+  bake(new_data = NULL)
 
-levels(r)<-list(c)
+levels(r) <- list(c)
 
-e<-n |>
-  bind_cols(terra::extract(r,n)) |>
+e <- n |>
+  bind_cols(terra::extract(r, n)) |>
   as_tibble()
 
 e |>
-  count(class,veg_class) |>
+  count(class, veg_class) |>
   arrange(veg_class) |>
   View()
 
@@ -332,7 +361,9 @@ It might be a good idea to filter out all nests with 0 canopy cover to build the
 ## Looking at height
 
 ```{r}
-h <- rast("D:\\GIS_Data\\Landfire\\LF2022_CH_230_CONUS\\LF2022_CH_230_CONUS\\Tif\\LC22_CH_230.tif")
+h <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2022_CH_230_CONUS\\LF2022_CH_230_CONUS\\Tif\\LC22_CH_230.tif"
+)
 activeCat(h) <- "METERS"
 r2_bd_cl <- r2_bd |>
   st_transform(crs(h))
@@ -354,38 +385,57 @@ height |>
   geom_col() +
   coord_flip()
 
+c_t <- crd_bd |>
+  st_transform(5070)
 
-evh<-rast("D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif") |>
-  crop(r2_bd_cl)
+evh <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif"
+) |>
+  crop(c_t)
 
-l<-levels(evh)
-c<-cats(evh)[[1]] |>
-  mutate(
-    meters_h = str_extract(CLASSNAMES, "\\d+"),
-    meters_h = ifelse(is.na(meters_h), 0, meters_h) |>
-      as.numeric()
-  )  
+source("R/evh_to_num.R")
+t<-evh_to_num(evh)
 
-new_cat<-l[[1]] |>
+l <- levels(evh)
+c <- cats(evh)[[1]] |>
   mutate(
     meters_h = str_extract(CLASSNAMES, "\\d+"),
     meters_h = ifelse(is.na(meters_h), 0, meters_h) |>
       as.numeric()
   ) |>
-  select(Value,meters_h)
+  select(Value, meters_h)
 
-levels(evh)<-list(c)
-activeCat(evh)<-"meters_h"
+new_cat <- l[[1]] |>
+  mutate(
+    meters_h = str_extract(CLASSNAMES, "\\d+"),
+    meters_h = ifelse(is.na(meters_h), 0, meters_h) |>
+      as.numeric()
+  ) |>
+  select(Value, meters_h)
+
+levels(evh) <- list(c)
+activeCat(evh) <- "meters_h"
+
+t<-catalyze(evh)
+
+evh[["meters_h_n"]]<-as.numeric(evh[["meters_h"]])
+
 evh
-plot(evh)
+as.numeric(evh)
+plot(as.numeric(evh))
 ```
 
 ## SClass examples
 ```{r}
-r<-rast("D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif")
+source("R/sclass_clean.R")
+r <- rast(
+  "D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif"
+)
 
-sclass<-r |>
+sclass <- r |>
   crop(c_t)
+
+t<-sclass_clean(sclass)
 
 cats(sclass)[[1]] |>
   as_tibble() |>

@@ -1,0 +1,150 @@
+---
+title: Evaluate Goshawk Model
+date: 2025-04-29
+tags: []
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: false
+  message: false
+  warning: false
+  class-output: 'r'
+---
+
+```{r}
+library(terra)
+library(sf)
+library(tidysdm)
+library(tidyverse)
+library(sjnftools)
+library(tidymodels)
+library(arcgislayers)
+library(targets)
+library(elevatr)
+library(tidyterra)
+library(MetBrewer)
+
+theme_set(theme_minimal())
+
+l <- list.files("R", full.names = T)
+for (f_path in l) {
+  source(f_path)
+}
+```
+
+```{r}
+nest_model <- tar_read(nogo_nest_model)
+
+crd_covs <- get_covs_for_predict(
+  crd_bd,
+  tar_read(evt_gp_n_grouped_level),
+  tar_read(epsg)
+)
+
+crd_covs[["canopy_cover"]] <- as.numeric(crd_covs[["canopy_cover"]])
+
+crd_pred <- predict_raster(nest_model, crd_covs)
+
+ggplot() +
+  geom_spatraster(data = crd_pred) +
+  scale_fill_gradientn(
+    colors = met.brewer("Johnson"),
+    na.value = "transparent",
+    transform = "reverse"
+  ) +
+  labs(
+    title = "Columbine Ranger District AMGO Nest Prediction"
+  ) +
+  theme(
+    legend.position = "top"
+  )
+```
+
+## Evaluating the model in region 3
+
+```{r}
+r3_nogo_nests <- tar_read(r3_nogo_nests)
+
+r3_boundaries <- tar_read(r3_boundaries)
+
+r3_testing_rd_id <- tar_read(r3_testing_rd_id)
+
+pred_rds <- function(rd_id, model, rd_boundaries) {
+  rd_bd <- rd_boundaries |>
+    filter(RANGERDISTRICTID == rd_id)
+
+  covs_all <- get_covs_for_predict(
+    rd_bd,
+    tar_read(evt_gp_n_grouped_level),
+    tar_read(epsg)
+  )
+
+  covs_all[["canopy_cover"]] <- as.numeric(covs_all[["canopy_cover"]])
+
+  predict_raster(model, covs_all)
+}
+
+# r3_test_preds <- lapply(r3_testing_rd_id, pred_rds, nest_model, r3_boundaries)
+
+rd1 <- pred_rds(r3_testing_rd_id[1], nest_model, r3_boundaries)
+rd2 <- pred_rds(r3_testing_rd_id[2], nest_model, r3_boundaries)
+# rd3 <- pred_rds(r3_testing_rd_id[3], nest_model, r3_boundaries)
+
+model_result <- r3_nogo_nests |>
+  bind_cols(terra::extract(rd1, r3_nogo_nests)) |>
+  rename(t1 = mean) |>
+  # bind_cols(terra::extract(rd2, r3_nogo_nests)) |>
+  # rename(t2=mean) |>
+  mutate(
+    model_result = case_when(
+      !is.na(t1) ~ t1,
+      # !is.na(t2)~t2,
+      TRUE ~ NA
+    )
+  ) |>
+  filter(!is.na(model_result))
+
+model_result |>
+  as_tibble() |>
+  ggplot(aes(model_result)) +
+  geom_histogram()
+
+cutoff <- model_result |>
+  as_tibble() |>
+  select(model_result, last_visit:last_vis_5, fs_unit_na)
+
+ggplot() +
+  geom_spatraster(data = rd1) +
+  geom_sf(data = st_crop(r3_nogo_nests, ext(rd1)), size = 3, color = "pink") +
+  scale_fill_gradientn(
+    colors = met.brewer("Johnson"),
+    na.value = "transparent",
+    transform = "reverse"
+  )
+
+ggplot() +
+  geom_spatraster(data = rd2) +
+  geom_sf(data = st_crop(r3_nogo_nests, ext(rd2)), size = 3, color = "pink") +
+  scale_fill_gradientn(
+    colors = met.brewer("Johnson"),
+    na.value = "transparent",
+    transform = "reverse"
+  )
+
+r3_boundaries |>
+  filter(RANGERDISTRICTID == r3_testing_rd_id[[1]])
+```
+## What is wrong with RD3
+```{r}
+
+```
+
+
+
+
+
+
+
+
