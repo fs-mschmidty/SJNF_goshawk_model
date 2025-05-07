@@ -25,6 +25,7 @@ library(targets)
 library(elevatr)
 library(tidyterra)
 library(MetBrewer)
+library(DALEX)
 
 theme_set(theme_minimal())
 
@@ -47,6 +48,8 @@ crd_covs[["canopy_cover"]] <- as.numeric(crd_covs[["canopy_cover"]])
 
 crd_pred <- predict_raster(nest_model, crd_covs)
 
+writeRaster(crd_pred, "output/mod_crd_20250506130740.tif")
+
 ggplot() +
   geom_spatraster(data = crd_pred) +
   scale_fill_gradientn(
@@ -61,6 +64,57 @@ ggplot() +
     legend.position = "top"
   )
 ```
+
+```{r}
+cov <- tar_read(all_covs) |>
+  drop_na() |>
+  mutate(canopy_cover = as.numeric(canopy_cover)) |>
+  select(-id)
+
+cov_imp <- cov |>
+  as_tibble() |>
+  select(-geometry, -class)
+
+exp_mod <- explain_tidysdm(nest_model, data = cov_imp)
+
+vip_ensamble <- model_parts(explainer = exp_mod)
+plot(vip_ensamble)
+```
+
+## Dolores and Pagosa
+```{r}
+d_bd <- sjnf_bd |>
+  filter(districtnumber == "05")
+
+dol_covs <- get_covs_for_predict(
+  d_bd,
+  tar_read(evt_gp_n_grouped_level),
+  tar_read(epsg)
+)
+
+dol_covs[["canopy_cover"]] <- as.numeric(dol_covs[["canopy_cover"]])
+
+dol_pred <- predict_raster(nest_model, dol_covs)
+
+writeRaster(dol_pred, "output/mod_dol_20250506130740.tif")
+
+p_bd <- sjnf_bd |>
+  filter(districtnumber == "06")
+
+pag_covs <- get_covs_for_predict(
+  p_bd,
+  tar_read(evt_gp_n_grouped_level),
+  tar_read(epsg)
+)
+
+pag_covs[["canopy_cover"]] <- as.numeric(pag_covs[["canopy_cover"]])
+
+pag_pred <- predict_raster(nest_model, pag_covs)
+
+writeRaster(pag_pred, "output/mod_pag_20250506130740.tif")
+```
+
+
 
 ## Evaluating the model in region 3
 
@@ -136,10 +190,28 @@ ggplot() +
 r3_boundaries |>
   filter(RANGERDISTRICTID == r3_testing_rd_id[[1]])
 ```
-## What is wrong with RD3
-```{r}
+## All nest predict
 
+```{r}
+r3_pred <- tar_read(r3_nogo_nest_predict)
+
+r3_pred_cutoff <- r3_pred |>
+  filter(
+    lubridate::year(last_visit) > 2010,
+    last_vis_5 == "Reproducing",
+    last_vis_3 != "Not Found",
+    evt_gp_n_grouped != "Other Forest"
+  )
+
+r3_pred_cutoff |>
+  count(evt_gp_n_grouped)
+
+r3_pred_cutoff |>
+  pull(mean) |>
+  quantile(.50)
 ```
+
+A few notes on evaluation.  In R3 prediction is good for forests near to the San Juan. Forests in southern New Mexico on the Gila have really bad predictions because they have lot of trees not in R2. 
 
 
 

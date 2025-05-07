@@ -1,14 +1,11 @@
 get_elevation_data <- function(base_raster) {
-  elev <- get_elev_raster(base_raster, z = 10, override_size_check = T, clip = "bbox") |>
+  elev <- get_elev_raster(
+    base_raster,
+    z = 10,
+    override_size_check = T,
+    clip = "bbox"
+  ) |>
     rast()
-
-
-  #
-  # cropped <- elev |>
-  #   crop(r2_cl)
-  #
-  # cropped <- cropped |>
-  #   project(base_raster)
 
   cropped <- elev
 

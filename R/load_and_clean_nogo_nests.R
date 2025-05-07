@@ -8,7 +8,7 @@ load_and_clean_nogo_nests <- function(path, epsg, year_cutoff) {
     ) |>
     st_centroid() |>
     st_transform(epsg) |>
-    filter(shape_stat == "CURRENT")
+    filter(shape_stat == "CURRENT", last_vis_4 == "Usable")
 
   data
 }

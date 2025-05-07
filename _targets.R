@@ -39,19 +39,70 @@ tar_source()
 list(
   tar_target(proj, "+proj=utm +zone=13"),
   tar_target(epsg, "epsg:26913"),
-  ## Need to centroid the nests they are currently polygons.
+  tar_target(
+    fs_regions,
+    arc_open(
+      "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RegionBoundaries_01/MapServer/1"
+    ) |>
+      arc_select() |>
+      filter(!REGION %in% c("10", "03", "08", "09")) |>
+      st_make_valid()
+  ),
+  tar_target(
+    fs_districts,
+    arc_open(
+      "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RangerDistricts_03/MapServer/1"
+    ) |>
+      arc_select() |>
+      st_make_valid() |>
+      filter(!REGION %in% c("10", "03", "08", "09")) |>
+      st_transform(st_crs(fs_regions))
+  ),
   tar_target(
     nogo_nest_sites,
     load_and_clean_nogo_nests(
-      "data/NorthernGoshawk_R2_NRM_20230731.shp",
+      "data/All_region_amgo.shp",
       epsg,
       year_cutoff = 2018
+    ) |>
+      st_transform(st_crs(fs_districts)) |>
+      st_intersection(fs_districts)
+  ),
+  tar_terra_rast(
+    elevation_all,
+    get_elev_raster(
+      st_buffer(nogo_nest_sites, 2000),
+      z = 10,
+      override_size_check = T,
+      clip = "bbox"
+    ) |>
+      rast()
+  ),
+  tar_target(
+    thinned_nest_sites,
+    tidysdm::thin_by_cell(
+      sf::st_transform(nogo_nest_sites, crs(elevation_all)),
+      elevation_all
     )
   ),
-  tar_target(model_area, build_model_area(r2_bd, nogo_nest_sites, epsg)),
-  tar_terra_rast(
+  tar_target(
+    psuedoabs,
+    sample_pseudoabs(
+      thinned_nest_sites,
+      elevation_all,
+      1200,
+      method = c("dist_disc", 2500, 10000)
+    ) |>
+      mutate(id = row_number())
+  ),
+  # tar_target(model_area, build_model_area(r2_bd, nogo_nest_sites, epsg)),
+  # tar_terra_rast(
+  #   terrain,
+  #   get_elevation_data(model_area)
+  # ),
+  tar_target(
     terrain,
-    get_elevation_data(model_area)
+    get_terrain_by_region(points = psuedoabs, regions = fs_regions)
   ),
   tar_target(
     tree_canopy_cover_file,
@@ -69,27 +120,10 @@ list(
       projection = proj
     )
   ),
-  tar_target(
-    thinned_nest_sites,
-    tidysdm::thin_by_cell(
-      sf::st_transform(nogo_nest_sites, crs(terrain)),
-      terrain
-    )
-  ),
-  tar_target(
-    psuedoabs,
-    sample_pseudoabs(
-      thinned_nest_sites,
-      tar_load_clip_tree_canopy_cover,
-      1000,
-      method = c("dist_disc", 2500, 10000)
-    ) |>
-      mutate(id = row_number())
-  ),
-  tar_target(
-    terrain_cov,
-    get_covariates(terrain, psuedoabs, cat = FALSE)
-  ),
+  # tar_target(
+  #   terrain_cov,
+  #   get_covariates(terrain, psuedoabs, cat = FALSE)
+  # ),
   tar_target(
     canopy_cover,
     get_covariates(tree_canopy_cover_file, psuedoabs, cat = FALSE) |>
@@ -137,7 +171,7 @@ list(
     all_covs,
     psuedoabs |>
       left_join(evt_height, by = "id") |>
-      left_join(terrain_cov, by = "id") |>
+      left_join(terrain, by = "id") |>
       left_join(canopy_cover, by = "id") |>
       left_join(surrounding_canopy_cover, by = "id") |>
       left_join(evt_gp_n_grouped, by = "id") |>
@@ -171,7 +205,8 @@ list(
       epsg,
       year_cutoff = 2005
     ) |>
-      filter(str_detect(sci_name, "atricapillus|gentilis"))
+      filter(str_detect(sci_name, "atricapillus|gentilis")) |>
+      mutate(id = row_number())
   ),
   tar_target(
     r3_boundaries,
@@ -205,6 +240,78 @@ list(
     test_boundary,
     r3_boundaries |>
       filter(RANGERDISTRICTID == r3_testing_rd_id[1])
+  ),
+  tar_terra_rast(
+    r3_terrain,
+    get_elevation_data(r3_boundaries)
+  ),
+  tar_terra_rast(
+    r3_tar_load_clip_tree_canopy_cover,
+    load_clip_tree_canopy_cover(
+      tree_canopy_cover_file,
+      r3_boundaries,
+      projection = proj
+    )
+  ),
+  tar_target(
+    r3_terrain_cov,
+    get_covariates(r3_terrain, r3_nogo_nests, cat = FALSE)
+  ),
+  tar_target(
+    r3_canopy_cover,
+    get_covariates(tree_canopy_cover_file, r3_nogo_nests, cat = FALSE) |>
+      rename(canopy_cover = Layer_1)
+  ),
+  tar_target(
+    r3_surrounding_canopy_cover,
+    build_surrounding_canopy_cover(tree_canopy_cover_file, r3_nogo_nests)
+  ),
+  tar_target(
+    r3_evt_lf,
+    get_covariates(landfire_evt_file, r3_nogo_nests, cat = "EVT_LF")
+  ),
+  tar_target(
+    r3_evt_gp_n,
+    get_covariates(landfire_evt_file, r3_nogo_nests, cat = "EVT_GP_N")
+  ),
+  tar_target(
+    r3_evt_gp_n_grouped,
+    get_covariates(
+      landfire_evt_file,
+      r3_nogo_nests,
+      new_level = evt_gp_n_grouped_level
+    )
+  ),
+  tar_target(
+    r3_evt_height,
+    get_evt_height_covariat(
+      "D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif",
+      r3_nogo_nests
+    )
+  ),
+  tar_target(
+    r3_sclass,
+    get_covariates_sclass(
+      "D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif",
+      r3_nogo_nests
+    )
+  ),
+  tar_target(
+    r3_all_covs,
+    r3_nogo_nests |>
+      left_join(r3_evt_height, by = "id") |>
+      left_join(r3_terrain_cov, by = "id") |>
+      left_join(r3_canopy_cover, by = "id") |>
+      left_join(r3_surrounding_canopy_cover, by = "id") |>
+      left_join(r3_evt_gp_n_grouped, by = "id") |>
+      left_join(r3_sclass, by = "id") |>
+      mutate(canopy_cover = as.numeric(canopy_cover)) |>
+      filter(!is.na(sclass), !is.na(focal_mean))
+  ),
+  tar_target(
+    r3_nogo_nest_predict,
+    r3_all_covs |>
+      bind_cols(predict(nogo_nest_model, r3_all_covs))
   ),
   tar_terra_rast(
     test_covs,

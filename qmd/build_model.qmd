@@ -434,4 +434,147 @@ writeRaster(flagstaff_predict, "output/mod_V5_flagstaff.tif")
 
 
 
+## Build model that with evaluation step
+```{r}
+cov <- tar_read(all_covs) |>
+  drop_na() |>
+  mutate(canopy_cover = as.numeric(canopy_cover)) |>
+  select(-id)
+
+set.seed(12345)
+
+cov_split <- spatial_initial_split(
+  cov,
+  prop = 1 / 4,
+  spatial_block_cv
+)
+autoplot(cov_split)
+
+cov_training <- training(cov_split)
+cov_testing <- testing(cov_split)
+
+nest_rec <- recipe(
+  cov_training,
+  formula = class ~
+    meters_h +
+      elevation +
+      slope +
+      aspect +
+      TPI +
+      TRI +
+      canopy_cover +
+      focal_mean +
+      evt_gp_n_grouped +
+      sclass
+) |>
+  step_normalize(all_numeric()) |>
+  step_dummy(evt_gp_n_grouped, sclass)
+
+cov |>
+  check_sdm_presence(class)
+```
+
+```{r}
+nest_models <-
+  # create the workflow_set
+  workflow_set(
+    preproc = list(default = nest_rec),
+    models = list(
+      # the standard glm specs
+      # glm = sdm_spec_glm(),
+      # rf specs with tuning
+      rf = sdm_spec_rf(),
+      # boosted tree model (gbm) specs with tuning
+      gbm = sdm_spec_boost_tree(),
+      # maxent specs with tuning
+      maxent = sdm_spec_maxent()
+    ),
+    # make all combinations of preproc and models,
+    cross = TRUE
+  ) %>%
+  # tweak controls to store information needed later to create the ensemble
+  option_add(control = control_ensemble_grid())
+```
+
+## cross validation
+```{r}
+set.seed(1234)
+nest_cv <- spatial_block_cv(
+  cov_training,
+  v = 5,
+  cellsize = grid_cellsize(cov),
+  offset = grid_offset(cov) + 0.00001
+)
+autoplot(nest_cv)
+check_splits_balance(nest_cv, class)
+```
+
+## Run Model
+```{r}
+set.seed(45657)
+nest_models <- nest_models |>
+  workflow_map(
+    "tune_grid",
+    resamples = nest_cv,
+    grid = 25,
+    metrics = sdm_metric_set(),
+    verbose = T
+  )
+```
+
+```{r}
+autoplot(nest_models)
+```
+
+
+```{r}
+nest_ensamble <- simple_ensemble() |>
+  add_member(nest_models, metric = "boyce_cont")
+
+saveRDS(nest_ensamble, "output/evaluated_model_20250507.rds")
+```
+
+### This section should be added to it's own document. 
+```{r}
+nest_ensamble <- readRDS("output/evaluated_model_20250506.rds")
+
+cov_testing_predict <- cov_testing |>
+  as_tibble() |>
+  bind_cols(predict(nest_ensamble, cov_testing)) |>
+  select(class, mean)
+
+cov_testing_predict |>
+  ggplot(aes(class, mean)) +
+  geom_boxplot()
+
+presence_test <- cov_testing_predict |>
+  filter(class == "presence")
+
+ninety_percentile <- presence_test |>
+  pull(mean) |>
+  quantile(0.10)
+
+fifty_percentile <- presence_test |>
+  pull(mean) |>
+  quantile(0.50)
+
+cov_testing_predict |>
+  filter(class == "pseudoabs") |>
+  pull(mean) |>
+  quantile(0.5)
+
+correct <- cov_testing_predict |>
+  mutate(
+    predicted_class = ifelse(mean > 0.5, "presence", "pseudoabs"),
+    correct = ifelse(class == predicted_class, 1, 0)
+  )
+
+correct |>
+  group_by(class, predicted_class) |>
+  summarize(n = n()) |>
+  ungroup() |>
+  group_by(class) |>
+  mutate(prop = n / sum(n))
+```
+
 

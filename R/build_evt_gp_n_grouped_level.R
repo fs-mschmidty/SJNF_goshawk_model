@@ -5,59 +5,60 @@ build_evt_gp_n_grouped_level <- function(x, psuedoabs) {
     as_tibble() |>
     mutate(
       EVT_GP_N = case_when(
-        EVT_LF != "Tree" ~ "Non-tree",
+        EVT_LF != "Tree" ~ EVT_LF,
+        str_detect(EVT_GP_N, "Juniper|Pinyon") ~ "Pinyon-Juniper Woodland",
         TRUE ~ EVT_GP_N
       )
     ) |>
-    select(Value, EVT_GP_N)
+    select(Value, EVT_GP_N, EVT_LF)
 
   levels(r) <- list(new_level)
 
-  n <- psuedoabs |>
+  r
+
+  points <- psuedoabs |>
     st_transform(crs(r))
 
-  activeCat(r) <- "EVT_GP_N"
+  t <- points |>
+    bind_cols(terra::extract(r, points)) |>
+    select(-ID)
 
-  evt_gp_n <- terra::extract(r, n) |>
-    as_tibble()
+  activeCat(r) <- "EVT_LF"
 
-  new_evt_tree_cl <- n |>
+  t <- t |>
+    bind_cols(terra::extract(r, points))
+
+  new_group <- t |>
     as_tibble() |>
-    bind_cols(evt_gp_n) |>
+    group_by(EVT_GP_N) |>
+    mutate(n = n()) |>
+    ungroup() |>
     mutate(
       evt_gp_n_grouped = case_when(
-        EVT_GP_N %in%
-          c(
-            "Western Riparian Woodland and Shrubland",
-            "Pinyon-Juniper Woodland",
-            "Limber Pine Woodland",
-            "Douglas-fir Forest and Woodland",
-            "Developed-Upland Evergreen Forest",
-            "Mountain Mahogany Woodland and Shrubland"
-          ) ~
-          "Other Forest",
+        EVT_LF == "Tree" & n < 15 ~ EVT_LF,
         TRUE ~ EVT_GP_N
       )
     ) |>
-    select(EVT_GP_N, evt_gp_n_grouped) |>
-    count(EVT_GP_N, evt_gp_n_grouped)
+    # mutate(evt_gp_n_grouped = fct_lump_min(evt_gp_n_grouped, min = 30, other_level = "Other")) |>
+    count(EVT_GP_N, evt_gp_n_grouped) |>
+    select(-n)
 
-  r2 <- rast(x)
+  count(new_group, evt_gp_n_grouped)
 
-  cats(r2)[[1]] |>
-    as_tibble() |>
-    mutate(
-      EVT_GP_N = case_when(
-        EVT_LF != "Tree" ~ "Non-tree",
-        TRUE ~ EVT_GP_N
-      )
-    ) |>
-    left_join(new_evt_tree_cl, by = "EVT_GP_N") |>
+  evt_gp_n_grouped_level <- new_level |>
+    left_join(new_group, by = "EVT_GP_N") |>
     mutate(
       evt_gp_n_grouped = case_when(
-        is.na(evt_gp_n_grouped) ~ "Other Forest",
+        is.na(evt_gp_n_grouped) ~ EVT_LF,
         TRUE ~ evt_gp_n_grouped
+      ),
+      evt_gp_n_grouped = ifelse(
+        evt_gp_n_grouped == "Tree",
+        "Other Tree",
+        evt_gp_n_grouped
       )
     ) |>
     select(Value, evt_gp_n_grouped)
+
+  evt_gp_n_grouped_level
 }

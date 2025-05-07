@@ -1,0 +1,41 @@
+---
+title: Exploring all of the nest data from Regions 1 to 4
+date: 2025-05-01
+tags: []
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: false
+  message: false
+  warning: false
+  class-output: 'r'
+---
+
+```{r}
+library(sf)
+library(terra)
+library(tidyverse)
+library(janitor)
+library(mapview)
+```
+
+```{r}
+d <- st_read("data/R1to4_NOGO.shp") |>
+  clean_names() |>
+  filter(
+    source_geo == "Point",
+    site_type == "Nest",
+    year(last_vis_1) >= 2018,
+  ) |>
+  st_centroid() |>
+  filter(shape_stat == "CURRENT")
+
+d |>
+  mapview()
+```
+
+
+
+
