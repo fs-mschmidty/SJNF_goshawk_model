@@ -1,2 +1,6 @@
 OPENTOPO_API_KEY=ec2ff6b6e3a8df8bab0a58d28152dce7
 CURLSSLOPT_REVOKE_BEST_EFFORT=TRUE
+
+RETICULATE_PYTHON="D:/code/r/wildlife_habitat_models/nogo/.venv/Scripts/python.exe"
+EARTHENGINE_PYTHON="D:/code/r/wildlife_habitat_models/nogo/.venv/Scripts/python.exe"
+

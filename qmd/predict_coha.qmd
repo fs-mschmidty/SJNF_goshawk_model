@@ -1,0 +1,58 @@
+---
+title: Predict COHA
+date: 2025-07-21
+tags: []
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: true
+  message: false
+  warning: false
+  class-output: 'r'
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(tidysdm)
+library(terra)
+library(sf)
+library(elevatr)
+library(sjnftools)
+library(targets)
+```
+
+```{r}
+l <- list.files("R", full.names = T)
+for (f_path in l) {
+  source(f_path)
+}
+
+crd_covs <- get_covs_for_predict(
+  crd_bd,
+  tar_read(coha_evt_gp_n_grouped_level),
+  tar_read(epsg)
+)
+
+plot(crd_covs$elevation)
+
+
+coha_model <- readRDS("output/coha_nest_model_20250722084404.rds")
+
+crd_covs$canopy_cover <- as.numeric(crd_covs$canopy_cover)
+
+crd_pred <- predict_raster(coha_model, crd_covs, type = "prob")
+
+writeRaster(crd_pred, "output/coha_mod_crd_20250722.tif")
+
+plot(crd_pred)
+```
+
+
+
+
+
+
+

@@ -7,7 +7,6 @@
 library(targets)
 library(sjnftools)
 library(geotargets)
-# library(tarchetypes) # Load other packages as needed.
 
 set.seed(12345)
 
@@ -28,7 +27,9 @@ tar_option_set(
     "geotargets",
     "tidysdm",
     "arcgislayers",
-    "tidymodels"
+    "tidymodels",
+    "rgee",
+    "googledrive"
   ), # packages that your targets need to run
   format = "qs", # Optionally set the default storage format. qs is fast.
 )
@@ -45,7 +46,7 @@ list(
       "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RegionBoundaries_01/MapServer/1"
     ) |>
       arc_select() |>
-      filter(!REGION %in% c("10", "03", "08", "09")) |>
+      filter(!region %in% c("10", "03", "08", "09")) |>
       st_make_valid()
   ),
   tar_target(
@@ -55,8 +56,13 @@ list(
     ) |>
       arc_select() |>
       st_make_valid() |>
-      filter(!REGION %in% c("10", "03", "08", "09")) |>
+      filter(!region %in% c("10", "03", "08", "09")) |>
       st_transform(st_crs(fs_regions))
+  ),
+  ## Load Tree Map
+  tar_target(
+    tree_map_path,
+    "D:\\GIS_Data\\TreeMap\\RDS-2025-0032\\Data\\TreeMap2022_CONUS.tif"
   ),
   tar_target(
     nogo_nest_sites,
@@ -66,271 +72,259 @@ list(
       year_cutoff = 2018
     ) |>
       st_transform(st_crs(fs_districts)) |>
-      st_intersection(fs_districts)
+      st_intersection(fs_districts) |>
+      st_intersection(filter(fs_regions, region == "02"))
   ),
   tar_terra_rast(
-    elevation_all,
-    get_elev_raster(
-      st_buffer(nogo_nest_sites, 2000),
-      z = 10,
-      override_size_check = T,
-      clip = "bbox"
-    ) |>
-      rast()
+    aggregate_treemap,
+    build_ag_treemap(tree_map_path, nogo_nest_sites, fact = 4)
   ),
   tar_target(
     thinned_nest_sites,
-    tidysdm::thin_by_cell(
-      sf::st_transform(nogo_nest_sites, crs(elevation_all)),
-      elevation_all
+    build_thinned_nest_sites(
+      nogo_nest_sites = nogo_nest_sites,
+      r_path = aggregate_treemap
     )
   ),
   tar_target(
     psuedoabs,
     sample_pseudoabs(
       thinned_nest_sites,
-      elevation_all,
-      1200,
-      method = c("dist_disc", 2500, 10000)
+      aggregate_treemap,
+      nrow(thinned_nest_sites) * 3,
+      method = c("dist_disc", 300, 10000)
     ) |>
       mutate(id = row_number())
   ),
-  # tar_target(model_area, build_model_area(r2_bd, nogo_nest_sites, epsg)),
-  # tar_terra_rast(
-  #   terrain,
-  #   get_elevation_data(model_area)
-  # ),
   tar_target(
     terrain,
-    get_terrain_by_region(points = psuedoabs, regions = fs_regions)
-  ),
-  tar_target(
-    tree_canopy_cover_file,
-    "D:\\GIS_Data\\NLCD\\nlcd_tcc_CONUS_2021_v2021-4\\nlcd_tcc_conus_2021_v2021-4.tif"
-  ),
-  tar_target(
-    landfire_evt_file,
-    "D:\\GIS_Data\\Landfire\\LF2023\\LF2023_EVT_240_CONUS\\LF2023_EVT_240_CONUS\\Tif\\LC23_EVT_240.tif"
-  ),
-  tar_terra_rast(
-    tar_load_clip_tree_canopy_cover,
-    load_clip_tree_canopy_cover(
-      tree_canopy_cover_file,
-      model_area,
-      projection = proj
+    get_gee_terrain(
+      geom_input = psuedoabs
     )
   ),
   # tar_target(
-  #   terrain_cov,
-  #   get_covariates(terrain, psuedoabs, cat = FALSE)
+  #   treemap,
+  #   get_gee_treemap(
+  #     geom_input = psuedoabs
+  #   )
   # ),
   tar_target(
+    canopy_height,
+    get_gee_canopy_height(psuedoabs)
+  ),
+  tar_target(
     canopy_cover,
-    get_covariates(tree_canopy_cover_file, psuedoabs, cat = FALSE) |>
-      rename(canopy_cover = Layer_1)
-  ),
-  tar_target(
-    surrounding_canopy_cover,
-    build_surrounding_canopy_cover(tree_canopy_cover_file, psuedoabs)
-  ),
-  tar_target(
-    evt_lf,
-    get_covariates(landfire_evt_file, psuedoabs, cat = "EVT_LF")
-  ),
-  tar_target(
-    evt_gp_n,
-    get_covariates(landfire_evt_file, psuedoabs, cat = "EVT_GP_N")
-  ),
-  tar_target(
-    evt_gp_n_grouped_level,
-    build_evt_gp_n_grouped_level(landfire_evt_file, psuedoabs)
-  ),
-  tar_target(
-    evt_gp_n_grouped,
-    get_covariates(
-      landfire_evt_file,
-      psuedoabs,
-      new_level = evt_gp_n_grouped_level
+    get_gee_canopy_cover(
+      geom_input = psuedoabs
     )
   ),
   tar_target(
-    evt_height,
-    get_evt_height_covariat(
-      "D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif",
-      psuedoabs
-    )
+    forest_type_raw,
+    get_tree_map_attribute(tree_map_path, "ForTypName", psuedoabs)
   ),
   tar_target(
-    sclass,
-    get_covariates_sclass(
-      "D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif",
-      psuedoabs
-    )
+    climate,
+    get_gee_climate(psuedoabs)
   ),
+  tar_target(
+    soil,
+    get_gee_ph(psuedoabs)
+  ),
+  tar_target(
+    distance_to_water,
+    get_gee_distance_to_water(geom_input = psuedoabs) |>
+      rename(DISTANCE_TO_WATER = first)
+  ),
+  # All coves
   tar_target(
     all_covs,
     psuedoabs |>
-      left_join(evt_height, by = "id") |>
       left_join(terrain, by = "id") |>
+      left_join(forest_type_raw, by = "id") |>
+      left_join(canopy_height, by = "id") |>
       left_join(canopy_cover, by = "id") |>
-      left_join(surrounding_canopy_cover, by = "id") |>
-      left_join(evt_gp_n_grouped, by = "id") |>
-      left_join(sclass, by = "id")
+      left_join(distance_to_water, by = "id") |>
+      # left_join(treemap, by = "id") |>
+      left_join(mutate(climate, id = as.numeric(id)), by = "id") |>
+      left_join(soil, by = "id") |>
+      drop_na() |>
+      select(-id)
+  ),
+  ## Build Model
+  tar_target(
+    nogo_model_recipe,
+    build_nogo_model_recipe(all_covs)
   ),
   tar_target(
     nogo_nest_model,
-    build_nogo_nest_model(all_covs)
+    build_nogo_nest_model(all_covs, nogo_model_recipe)
   ),
   tar_target(
     nogo_nest_model_output,
     save_nogo_nest_model(nogo_nest_model)
   ),
   tar_terra_rast(
-    crd_covs,
-    get_covs_for_predict(
-      area = crd_bd,
-      evt_gps = evt_gp_n_grouped_level,
-      proj = epsg
-    ),
-    datatype = "INT4S"
+    treemap_for_type_crd,
+    rast(tree_map_path) |>
+      crop(st_transform(crd_bd, 5070), mask = T),
+    preserve_metadata = "zip"
   ),
-  # tar_terra_rast(
-  #   crd_prediction,
-  #   predict_raster(nogo_nest_model, crd_covs)
-  # ),
+  tar_terra_rast(
+    treemap_crd,
+    get_gee_treemap(
+      geom_input = treemap_for_type_crd
+    ),
+    preserve_metadata = "zip"
+  ),
+  tar_terra_rast(
+    canopy_height_crd,
+    get_gee_canopy_height(
+      geom_input = treemap_for_type_crd
+    )
+  ),
+  tar_terra_rast(
+    terrain_crd,
+    get_gee_terrain(
+      geom_input = treemap_for_type_crd
+    ),
+    preserve_metadata = "zip"
+  ),
+  tar_terra_rast(
+    climate_crd,
+    get_gee_climate(
+      geom_input = treemap_for_type_crd
+    ),
+    preserve_metadata = "zip"
+  ),
+  ## Soils Data
+  tar_terra_rast(
+    soil_crd,
+    get_gee_ph(
+      geom_input = treemap_for_type_crd
+    )
+  ),
+  tar_terra_rast(
+    canopy_cover_crd,
+    get_gee_canopy_cover(
+      geom_input = treemap_for_type_crd
+    )
+  ),
+  tar_terra_rast(
+    distance_to_water_crd,
+    get_gee_distance_to_water(
+      geom_input = treemap_for_type_crd
+    )
+  ),
+  tar_terra_rast(
+    crd_covs,
+    make_predict_covs(
+      c(
+        treemap_crd,
+        treemap_for_type_crd,
+        canopy_height_crd,
+        canopy_cover_crd,
+        distance_to_water_crd,
+        terrain_crd,
+        climate_crd,
+        soil_crd
+      )
+    ),
+    preserve_metadata = "zip"
+  ),
+  tar_terra_rast(
+    crd_predict,
+    predict_raster(
+      nogo_nest_model,
+      crd_covs,
+      typ = "prob"
+    )
+  ),
   tar_target(
-    r3_nogo_nests,
+    pagosa_rd,
+    fs_districts |>
+      filter(districtorgcode == "021306") |>
+      st_make_valid() |>
+      st_union() |>
+      st_as_sf()
+  ),
+  tar_target(
+    dolores_rd,
+    fs_districts |>
+      filter(districtorgcode == "021305") |>
+      st_make_valid() |>
+      st_union() |>
+      st_as_sf()
+  ),
+  tar_target(
+    columbine_rd,
+    fs_districts |>
+      filter(districtorgcode == "021308") |>
+      st_make_valid() |>
+      st_union() |>
+      st_as_sf()
+  ),
+  tar_terra_rast(
+    pag_predict,
+    predict_rd(
+      geom_input = pagosa_rd,
+      model = nogo_nest_model,
+      tree_map_path = tree_map_path
+    )
+  ),
+  tar_terra_rast(
+    dol_predict,
+    predict_rd(
+      geom_input = dolores_rd,
+      model = nogo_nest_model,
+      tree_map_path = tree_map_path
+    )
+  ),
+  tar_target(
+    coha_nest_sites,
     load_and_clean_nogo_nests(
-      "data/R3_Accipiters_04032025.shp",
+      "data/COHA_SSHA_SITES_ALL_REGIONS.shp",
       epsg,
-      year_cutoff = 2005
+      year_cutoff = 2018
     ) |>
-      filter(str_detect(sci_name, "atricapillus|gentilis")) |>
+      st_transform(st_crs(fs_districts)) |>
+      st_intersection(fs_districts) |>
+      filter(str_detect(sci_name, "cooperii"))
+  ),
+  tar_target(
+    coha_thinned_nest_sites,
+    build_thinned_nest_sites(
+      nogo_nest_sites = coha_nest_sites,
+      r_path = aggregate_treemap
+    )
+  ),
+  tar_target(
+    coha_psuedoabs,
+    sample_pseudoabs(
+      coha_thinned_nest_sites,
+      aggregate_treemap,
+      nrow(coha_thinned_nest_sites) * 3,
+      method = c("dist_disc", 300, 10000)
+    ) |>
       mutate(id = row_number())
   ),
   tar_target(
-    r3_boundaries,
-    arc_open(
-      "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RangerDistricts_03/MapServer/1"
-    ) |>
-      arc_select(where = "REGION='03'")
+    coha_covs,
+    build_covs_all(input_geom = coha_psuedoabs, tree_map_path = tree_map_path)
   ),
   tar_target(
-    r3_testing_forests,
-    r3_boundaries |>
-      select(FORESTNAME, DISTRICTNAME, RANGERDISTRICTID) |>
-      st_transform(st_crs(r3_nogo_nests)) |>
-      st_intersection(select(
-        r3_nogo_nests,
-        sci_name,
-        last_visit,
-        last_vis_4,
-        shape_stat
-      ))
+    coha_model_recipe,
+    build_nogo_model_recipe(coha_covs)
   ),
   tar_target(
-    r3_testing_rd_id,
-    r3_testing_forests |>
-      as_tibble() |>
-      count(FORESTNAME, DISTRICTNAME, RANGERDISTRICTID, sort = T) |>
-      filter(n > 10) |>
-      pull(RANGERDISTRICTID)
-  ),
-  tar_target(
-    test_boundary,
-    r3_boundaries |>
-      filter(RANGERDISTRICTID == r3_testing_rd_id[1])
+    coha_nest_model,
+    build_nogo_nest_model(coha_covs, coha_model_recipe)
   ),
   tar_terra_rast(
-    r3_terrain,
-    get_elevation_data(r3_boundaries)
-  ),
-  tar_terra_rast(
-    r3_tar_load_clip_tree_canopy_cover,
-    load_clip_tree_canopy_cover(
-      tree_canopy_cover_file,
-      r3_boundaries,
-      projection = proj
-    )
-  ),
-  tar_target(
-    r3_terrain_cov,
-    get_covariates(r3_terrain, r3_nogo_nests, cat = FALSE)
-  ),
-  tar_target(
-    r3_canopy_cover,
-    get_covariates(tree_canopy_cover_file, r3_nogo_nests, cat = FALSE) |>
-      rename(canopy_cover = Layer_1)
-  ),
-  tar_target(
-    r3_surrounding_canopy_cover,
-    build_surrounding_canopy_cover(tree_canopy_cover_file, r3_nogo_nests)
-  ),
-  tar_target(
-    r3_evt_lf,
-    get_covariates(landfire_evt_file, r3_nogo_nests, cat = "EVT_LF")
-  ),
-  tar_target(
-    r3_evt_gp_n,
-    get_covariates(landfire_evt_file, r3_nogo_nests, cat = "EVT_GP_N")
-  ),
-  tar_target(
-    r3_evt_gp_n_grouped,
-    get_covariates(
-      landfire_evt_file,
-      r3_nogo_nests,
-      new_level = evt_gp_n_grouped_level
-    )
-  ),
-  tar_target(
-    r3_evt_height,
-    get_evt_height_covariat(
-      "D:\\GIS_Data\\Landfire\\LF2023_EVH_240_CONUS\\LF2023_EVH_240_CONUS\\Tif\\LC23_EVH_240.tif",
-      r3_nogo_nests
-    )
-  ),
-  tar_target(
-    r3_sclass,
-    get_covariates_sclass(
-      "D:\\GIS_Data\\Landfire\\LF2023_SClass_240_CONUS\\LF2023_SClass_240_CONUS\\Tif\\LC23_SCla_240.tif",
-      r3_nogo_nests
-    )
-  ),
-  tar_target(
-    r3_all_covs,
-    r3_nogo_nests |>
-      left_join(r3_evt_height, by = "id") |>
-      left_join(r3_terrain_cov, by = "id") |>
-      left_join(r3_canopy_cover, by = "id") |>
-      left_join(r3_surrounding_canopy_cover, by = "id") |>
-      left_join(r3_evt_gp_n_grouped, by = "id") |>
-      left_join(r3_sclass, by = "id") |>
-      mutate(canopy_cover = as.numeric(canopy_cover)) |>
-      filter(!is.na(sclass), !is.na(focal_mean))
-  ),
-  tar_target(
-    r3_nogo_nest_predict,
-    r3_all_covs |>
-      bind_cols(predict(nogo_nest_model, r3_all_covs))
-  ),
-  tar_terra_rast(
-    test_covs,
-    get_covs_for_predict(
-      area = test_boundary,
-      evt_gp_n_grouped_level,
-      proj = epsg
-    )
-  ),
-  # tar_terra_rast(
-  tar_target(
-    carson_model,
-    get_rd_prediction(
-      model_path = "output/model_V5.rds",
-      rds = r3_boundaries,
-      rd_id = r3_testing_rd_id[[1]],
-      terrain_model = terrain,
-      canopy_cover = tar_load_clip_tree_canopy_cover,
-      evt_gp_n_new_level = evt_gp_n_grouped_level
+    col_coha_predict,
+    predict_rd(
+      geom_input = columbine_rd,
+      model = coha_nest_model,
+      tree_map_path = tree_map_path
     )
   )
 )

@@ -1,26 +1,4 @@
-build_nogo_nest_model <- function(covs) {
-  cov <- covs |>
-    drop_na() |>
-    mutate(canopy_cover = as.numeric(canopy_cover)) |>
-    select(-id)
-
-  nest_rec <- recipe(
-    cov,
-    formula = class ~
-      meters_h +
-        elevation +
-        slope +
-        aspect +
-        TPI +
-        TRI +
-        canopy_cover +
-        focal_mean +
-        evt_gp_n_grouped +
-        sclass
-  ) |>
-    step_normalize(all_numeric()) |>
-    step_dummy(evt_gp_n_grouped, sclass)
-
+build_nogo_nest_model <- function(cov, nest_rec) {
   nest_models <-
     # create the workflow_set
     workflow_set(
@@ -33,11 +11,18 @@ build_nogo_nest_model <- function(covs) {
         # boosted tree model (gbm) specs with tuning
         gbm = sdm_spec_boost_tree(),
         # maxent specs with tuning
+        # gam = sdm_spec_gam()
         maxent = sdm_spec_maxent()
       ),
       # make all combinations of preproc and models,
       cross = TRUE
-    ) %>%
+    ) |>
+    # set formula for gams
+    # update_workflow_model(
+    #   "default_gam",
+    #   spec = sdm_spec_gam(),
+    #   formula = gam_formula(nest_rec)
+    # ) |>
     # tweak controls to store information needed later to create the ensemble
     option_add(control = control_ensemble_grid())
 

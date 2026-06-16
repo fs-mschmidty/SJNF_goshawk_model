@@ -1,0 +1,151 @@
+---
+title: NOGO Model Documentation V2
+date: 2026-05-13
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: false
+  message: false
+  warning: false
+  class-output: 'r'
+---
+```{r}
+library(tidymodels)
+library(tidysdm)
+library(tidyverse)
+library(terra)
+library(sf)
+library(tidyterra)
+library(DALEX)
+library(targets)
+library(tidyterra)
+```
+
+
+Model info for NOGO model.
+
+```{r}
+model <- tar_read(nogo_nest_model)
+
+model_exp <- explain_tidysdm(
+  model,
+  tar_read(all_covs) |> as_tibble() |> select(-class, -geometry)
+)
+
+vip <- model_parts(explainer = model_exp)
+plot(vip)
+```
+
+```{r}
+perf <- model_performance(model_exp)
+perf
+plot(perf)
+```
+
+Better threshold
+```{r}
+
+dat <- tibble(
+  y = model_exp$y, # observed (0/1)
+  pred = model_exp$y_hat # predicted probability
+)
+
+
+threshold_table <- function(y, pred, n = 200) {
+  ths <- seq(0, 1, length.out = n)
+
+  out <- lapply(ths, function(t) {
+    pred_class <- ifelse(pred >= t, 1, 0)
+
+    TP <- sum(y == 1 & pred_class == 1)
+    TN <- sum(y == 0 & pred_class == 0)
+    FP <- sum(y == 0 & pred_class == 1)
+    FN <- sum(y == 1 & pred_class == 0)
+
+    recall <- TP / (TP + FN)
+    precision <- TP / (TP + FP)
+    specificity <- TN / (TN + FP)
+    f1 <- 2 * precision * recall / (precision + recall)
+    tss <- recall + specificity - 1
+
+    data.frame(
+      threshold = t,
+      recall = recall,
+      precision = precision,
+      specificity = specificity,
+      f1 = f1,
+      tss = tss
+    )
+  })
+
+  dplyr::bind_rows(out)
+}
+
+thr_df <- threshold_table(dat$y, dat$pred)
+
+
+best_recall <- thr_df %>% slice_max(recall)
+best_recall
+
+
+best_tss <- thr_df %>% slice_max(tss)
+best_tss
+
+
+best_f1 <- thr_df %>% slice_max(f1)
+best_f1
+
+new_cut <- best_tss$threshold
+
+
+new_perf <- model_performance(
+  model_exp,
+  cutoff = new_cut
+)
+
+new_perf
+```
+
+```{r}
+tar_read(all_covs) |>
+  as_tibble() |>
+  select(where(is.numeric)) |>
+  cor(use = "complete.obs", method = "pearson") |>
+  View()
+```
+
+## Model output on the Columbine Ranger District
+```{r}
+crd <- tar_read(crd_predict) |>
+  mutate(
+    value_bin = cut(
+      mean,
+      breaks = c(0, 0.4, 0.7, 1.0),
+      labels = c("Unlikely", "Likely", "Core"), # Custom labels
+      include.lowest = TRUE
+    )
+  )
+
+ggplot() +
+  geom_spatraster(
+    data = crd,
+    aes(fill = value_bin)
+  ) +
+  scale_fill_manual(
+    values = c("#edf8b1", "#7fcdbb", "#2c7fb8"),
+    na.value = "transparent"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
+
+
+
+
+

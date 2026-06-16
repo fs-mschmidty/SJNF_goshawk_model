@@ -552,7 +552,7 @@ presence_test <- cov_testing_predict |>
 
 ninety_percentile <- presence_test |>
   pull(mean) |>
-  quantile(0.10)
+  quantile(0.05)
 
 fifty_percentile <- presence_test |>
   pull(mean) |>

@@ -1,0 +1,13 @@
+---
+title: NOGO Model Documentation
+date: 2025-05-13
+format: 
+  commonmark:
+    keep-yaml: true
+    df-print: tibble
+execute:
+  echo: false
+  message: false
+  warning: false
+  class-output: 'r'
+---

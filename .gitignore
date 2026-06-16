@@ -5,3 +5,7 @@ data/
 output/evt_cov.*
 output/model_covs*
 output/amgo_nest_xy.csv
+.Renviron
+.venv/
+
+learn-py-gee-mschmidty-f58d6efe5a93.json
